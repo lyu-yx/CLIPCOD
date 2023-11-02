@@ -136,7 +136,7 @@ def main_worker(gpu, args):
     print('load data...')
     train_data = CamObjDataset(image_root=args.train_root + 'Imgs/',
                               gt_root=args.train_root + 'GT/',
-                              fix_root=args.train_root + 'Edge/',
+                              fix_root=args.train_root + 'Fix/',
                               desc_root=args.train_root + 'Desc/',
                               batchsize=args.batchsize,
                               trainsize=args.input_size,

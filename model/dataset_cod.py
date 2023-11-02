@@ -100,6 +100,7 @@ class CamObjDataset(data.Dataset):
 
         # filter mathcing degrees of files
         self.filter_files()
+
         # transforms
         self.img_transform = transforms.Compose([
             transforms.Resize((self.trainsize, self.trainsize)),
@@ -113,10 +114,12 @@ class CamObjDataset(data.Dataset):
         print('>>> trainig/validing with {} samples'.format(self.size))
 
     def __getitem__(self, index):
-        # read assest/gts/grads/depths
+        # read assest/gts/fix/desc
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
-        fix = self.binary_loader(self.fix[index])
+        fix = self.gray_loader(self.fix[index])
+        with open(self.desc[index], 'r') as file:
+                desc = file.read()
 
         # data augumentation
         image, gt, fix = cv_random_flip(image, gt, fix)
@@ -125,25 +128,29 @@ class CamObjDataset(data.Dataset):
 
         image = colorEnhance(image)
         gt = randomPeper(gt)
-
+        fix = randomPeper(fix)
+        
         image = self.img_transform(image)
         gt = self.gt_transform(gt)
         fix = self.gt_transform(fix)
 
-        return image, gt, fix
+        return image, gt, fix, desc
 
     def filter_files(self):
-        assert len(self.images) == len(self.gts) and len(self.gts) == len(self.images)
-        images = []
-        gts = []
-        for img_path, gt_path in zip(self.images, self.gts):
-            img = Image.open(img_path)
-            gt = Image.open(gt_path)
-            if img.size == gt.size:
-                images.append(img_path)
-                gts.append(gt_path)
+        assert all(len(lst) == len(self.images) for lst in [self.gts, self.fix, self.desc])
+        images, gts, fix, desc = [], [], [], []
+        for img_pth, gt_pth, fix_pth, desc_pth in zip(self.images, self.gts, self.fix, self.desc):
+            img = Image.open(img_pth)
+            gt = Image.open(gt_pth)
+            fix = Image.open(fix_pth)
+            
+            if img.size == gt.size == fix.size:
+                images.append(img_pth)
+                gts.append(gt_pth)
+                fix.append(fix_pth)
         self.images = images
         self.gts = gts
+        self.fix = fix
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
@@ -151,6 +158,11 @@ class CamObjDataset(data.Dataset):
             return img.convert('RGB')
 
     def binary_loader(self, path):
+        with open(path, 'rb') as f:
+            img = Image.open(f)
+            return img.convert('L')
+    
+    def gray_loader(self, path):
         with open(path, 'rb') as f:
             img = Image.open(f)
             return img.convert('L')
@@ -212,6 +224,11 @@ class test_dataset:
             return img.convert('RGB')
 
     def binary_loader(self, path):
+        with open(path, 'rb') as f:
+            img = Image.open(f)
+            return img.convert('L')
+    
+    def gray_loader(self, path):
         with open(path, 'rb') as f:
             img = Image.open(f)
             return img.convert('L')
