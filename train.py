@@ -36,7 +36,7 @@ def get_parser():
     parser = argparse.ArgumentParser(
         description='Pytorch Referring Expression Segmentation')
     parser.add_argument('--config',
-                        default='path to xxx.yaml',
+                        default='config\CODdataset\codclip_vit_L14@336.yaml',
                         type=str,
                         help='config file')
     parser.add_argument('--opts',
@@ -111,26 +111,6 @@ def main_worker(gpu, args):
                             gamma=args.lr_decay)
     scaler = amp.GradScaler()
 
-    # build dataset
-    # args.batch_size = int(args.batch_size / args.ngpus_per_node)
-    # args.batch_size_val = int(args.batch_size_val / args.ngpus_per_node)
-    # args.workers = int(
-    #     (args.workers + args.ngpus_per_node - 1) / args.ngpus_per_node)
-    # train_data = RefDataset(lmdb_dir=args.train_lmdb,
-    #                         mask_dir=args.mask_root,
-    #                         dataset=args.dataset,
-    #                         split=args.train_split,
-    #                         mode='train',
-    #                         input_size=args.input_size,
-    #                         word_length=args.word_len)
-    # val_data = RefDataset(lmdb_dir=args.val_lmdb,
-    #                       mask_dir=args.mask_root,
-    #     ``                  dataset=args.dataset,
-    #                       split=args.val_split,
-    #                       mode='val',
-    #                       input_size=args.input_size,
-    #                       word_length=args.word_len)
-    
     
     # build dataset
     print('load data...')

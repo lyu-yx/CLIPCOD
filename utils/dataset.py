@@ -2,9 +2,8 @@ import os
 from typing import List, Union
 
 import cv2
-import lmdb
 import numpy as np
-import pyarrow as pa
+
 import torch
 from torch.utils.data import Dataset
 
@@ -84,12 +83,7 @@ def tokenize(texts: Union[str, List[str]],
     return result
 
 
-def loads_pyarrow(buf):
-    """
-    Args:
-        buf: the output of `dumps`.
-    """
-    return pa.deserialize(buf)
+
 
 
 class RefDataset(Dataset):

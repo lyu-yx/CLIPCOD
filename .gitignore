@@ -1,3 +1,4 @@
 config/refcoco
 pretrain
 dataset
+*.pyc
