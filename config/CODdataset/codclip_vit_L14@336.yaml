@@ -1,6 +1,6 @@
 DATA:
-  train_root: dataset/TrainDataset
-  val_root: dataset/TestDataset
+  train_root: dataset/TrainDataset/
+  val_root: dataset/TestDataset/CAMO/
   dataset: CODtraindataset
   # dataset: refcoco
   # train_lmdb: datasets/lmdb/refcoco/train.lmdb
@@ -10,10 +10,10 @@ DATA:
   # mask_root: datasets/masks/refcoco
 TRAIN:
   # Base Arch
-  clip_pretrain: pretrain/ViT-L-14@336px
+  clip_pretrain: pretrain/ViT-L-14-336px.pt
   input_size: 352
   word_len: 77
-  # word_dim: 1024
+  word_dim: 1024
   vis_dim: 512
   fpn_in: [512, 1024, 1024]
   fpn_out: [256, 512, 1024]
@@ -30,8 +30,8 @@ TRAIN:
   epochs: 50
   milestones: [35]
   start_epoch: 0
-  batch_size: 64  # batch size for training
-  batch_size_val: 64  # batch size for validation during training, memory and speed tradeoff
+  batch_size: 2  # batch size for training
+  batch_size_val: 2  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.0001
   lr_decay: 0.1
   lr_multi: 0.1

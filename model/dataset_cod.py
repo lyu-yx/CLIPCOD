@@ -2,10 +2,12 @@ import os
 import random
 import numpy as np
 from PIL import Image, ImageEnhance
+from typing import List, Union
 
+import torch
 import torch.utils.data as data
 import torchvision.transforms as transforms
-
+from .simple_tokenizer import SimpleTokenizer as _Tokenizer
 
 def cv_random_flip(img, label, grad):
     flip_flag = random.randint(0, 1)
@@ -78,11 +80,56 @@ def randomPeper(img):
             img[randX, randY] = 255
     return Image.fromarray(img)
 
+_tokenizer = _Tokenizer()
+def tokenize(texts: Union[str, List[str]],
+             context_length: int = 77,
+             truncate: bool = False) -> torch.LongTensor:
+    """
+    Returns the tokenized representation of given input string(s)
+
+    Parameters
+    ----------
+    texts : Union[str, List[str]]
+        An input string or a list of input strings to tokenize
+
+    context_length : int
+        The context length to use; all CLIP models use 77 as the context length
+
+    truncate: bool
+        Whether to truncate the text in case its encoding is longer than the context length
+
+    Returns
+    -------
+    A two-dimensional tensor containing the resulting tokens, shape = [number of input strings, context_length]
+    """
+    if isinstance(texts, str):
+        texts = [texts]
+
+    sot_token = _tokenizer.encoder["<|startoftext|>"]
+    eot_token = _tokenizer.encoder["<|endoftext|>"]
+    all_tokens = [[sot_token] + _tokenizer.encode(text) + [eot_token]
+                  for text in texts]
+    result = torch.zeros(len(all_tokens), context_length, dtype=torch.long)
+
+    for i, tokens in enumerate(all_tokens):
+        if len(tokens) > context_length:
+            if truncate:
+                tokens = tokens[:context_length]
+                tokens[-1] = eot_token
+            else:
+                raise RuntimeError(
+                    f"Input {texts[i]} is too long for context length {context_length}"
+                )
+        result[i, :len(tokens)] = torch.tensor(tokens)
+
+    return result
+
 
 # dataset for training
 class CamObjDataset(data.Dataset):
-    def __init__(self, image_root, gt_root, fix_root, desc_root,  trainsize):
+    def __init__(self, image_root, gt_root, fix_root, desc_root, trainsize, word_length):
         self.trainsize = trainsize
+        self.word_length = word_length
         # get filenames
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg')
                        or f.endswith('.png')]
@@ -134,11 +181,13 @@ class CamObjDataset(data.Dataset):
         gt = self.gt_transform(gt)
         fix = self.gt_transform(fix)
 
+        word_vec = tokenize(desc, self.word_length, True).squeeze(0)
+
         return image, gt, fix, desc
 
     def filter_files(self):
         assert all(len(lst) == len(self.images) for lst in [self.gts, self.fix, self.desc])
-        images, gts, fix, desc = [], [], [], []
+        images, gts, fixs, desc = [], [], [], []
         for img_pth, gt_pth, fix_pth, desc_pth in zip(self.images, self.gts, self.fix, self.desc):
             img = Image.open(img_pth)
             gt = Image.open(gt_pth)
@@ -147,10 +196,10 @@ class CamObjDataset(data.Dataset):
             if img.size == gt.size == fix.size:
                 images.append(img_pth)
                 gts.append(gt_pth)
-                fix.append(fix_pth)
+                fixs.append(fix_pth)
         self.images = images
         self.gts = gts
-        self.fix = fix
+        self.fixs = fixs
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:

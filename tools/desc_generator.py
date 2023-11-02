@@ -28,15 +28,21 @@ max_cnt = 0
 
 
 for file in tqdm(file_list):
-    cnt = 0
+    cnt, flg = 0, 0
     filename = os.path.basename(file)
     for attr in attr_list:
         search_list = glob(os.path.join(attr_root, attr, "*.jpg"))
         contains = [s for s in search_list if filename in s]
         if contains:
-            # with open(os.path.join(target_pth, filename + ".txt"), 'a') as file:
-            #     file.write(attr_exp[attr_list.index(attr)])
+            with open(os.path.join(target_pth, filename + ".txt"), 'a') as file:
+                file.write(attr_exp[attr_list.index(attr)])
+            flg = 1
             cnt += 1
+        continue
+
+    if flg==0:
+        with open(os.path.join(target_pth, filename + ".txt"), 'a') as file:
+            file.write("Normal Camouflaged object.")
     occ_num[cnt] += 1
     if cnt > max_cnt:
         max_cnt = cnt 

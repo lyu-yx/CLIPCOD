@@ -118,9 +118,8 @@ def main_worker(gpu, args):
                               gt_root=args.train_root + 'GT/',
                               fix_root=args.train_root + 'Fix/',
                               desc_root=args.train_root + 'Desc/',
-                              batchsize=args.batchsize,
                               trainsize=args.input_size,
-                              num_workers=4)
+                              word_length=args.word_len)
     val_data = test_dataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
                               testsize=args.input_size)
@@ -134,8 +133,6 @@ def main_worker(gpu, args):
     train_sampler = data.distributed.DistributedSampler(train_data,
                                                         shuffle=True)
     val_sampler = data.distributed.DistributedSampler(val_data, shuffle=False)
-
-
 
     train_loader = data.DataLoader(train_data,
                                    batch_size=args.batch_size,
@@ -152,7 +149,6 @@ def main_worker(gpu, args):
                                  pin_memory=True,
                                  sampler=val_sampler,
                                  drop_last=False)
-
     best_IoU = 0.0
     # resume
     if args.resume:
