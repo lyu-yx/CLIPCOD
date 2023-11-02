@@ -88,7 +88,7 @@ def main_worker(gpu, args):
         wandb.init(job_type="training",
                    mode="online",
                    config=args,
-                   project="CRIS",
+                   project="CLIPCOD",
                    name=args.exp_name,
                    tags=[args.dataset, args.clip_pretrain])
     dist.barrier()
@@ -137,12 +137,13 @@ def main_worker(gpu, args):
     train_data = CamObjDataset(image_root=args.train_root + 'Imgs/',
                               gt_root=args.train_root + 'GT/',
                               fix_root=args.train_root + 'Edge/',
+                              desc_root=args.train_root + 'Desc/',
                               batchsize=args.batchsize,
-                              trainsize=args.trainsize,
+                              trainsize=args.input_size,
                               num_workers=4)
     val_data = test_dataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
-                              testsize=args.trainsize)
+                              testsize=args.input_size)
     total_step = len(train_data)
 
     # build dataloader

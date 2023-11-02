@@ -12,8 +12,8 @@ TRAIN:
   # Base Arch
   clip_pretrain: pretrain/ViT-L-14@336px
   input_size: 352
-  word_len: 17
-  word_dim: 1024
+  word_len: 77
+  # word_dim: 1024
   vis_dim: 512
   fpn_in: [512, 1024, 1024]
   fpn_out: [256, 512, 1024]

@@ -81,20 +81,22 @@ def randomPeper(img):
 
 # dataset for training
 class CamObjDataset(data.Dataset):
-    def __init__(self, image_root, gt_root, fixation_root, trainsize):
+    def __init__(self, image_root, gt_root, fix_root, desc_root,  trainsize):
         self.trainsize = trainsize
         # get filenames
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg')
                        or f.endswith('.png')]
         self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.jpg')
                     or f.endswith('.png')]
-        self.grads = [fixation_root + f for f in os.listdir(fixation_root) if f.endswith('.jpg')
+        self.fix = [fix_root + f for f in os.listdir(fix_root) if f.endswith('.jpg')
                       or f.endswith('.png')]
+        self.desc = [desc_root + f for f in os.listdir(desc_root) if f.endswith('.txt')]
 
         # sorted files
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
-        self.grads = sorted(self.grads)
+        self.fix = sorted(self.fix)
+        self.desc = sorted(self.desc)
 
         # filter mathcing degrees of files
         self.filter_files()
@@ -114,7 +116,7 @@ class CamObjDataset(data.Dataset):
         # read assest/gts/grads/depths
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
-        fix = self.binary_loader(self.grads[index])
+        fix = self.binary_loader(self.fix[index])
 
         # data augumentation
         image, gt, fix = cv_random_flip(image, gt, fix)
