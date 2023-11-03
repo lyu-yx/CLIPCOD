@@ -36,7 +36,7 @@ def get_parser():
     parser = argparse.ArgumentParser(
         description='Pytorch Referring Expression Segmentation')
     parser.add_argument('--config',
-                        default='config\CODdataset\codclip_vit_L14@336.yaml',
+                        default='config/CODdataset/codclip_vit_L14@336.yaml',
                         type=str,
                         help='config file')
     parser.add_argument('--opts',
