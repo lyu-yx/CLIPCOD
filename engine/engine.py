@@ -34,13 +34,13 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     # idx = np.random.choice(len(size_list))
     # new_size = size_list[idx]
 
-    for i, (image, text, target) in enumerate(train_loader):
+    for i, (image, target, fix, text) in enumerate(train_loader):
         data_time.update(time.time() - end)
         # data
         image = image.cuda(non_blocking=True)
-        text = text.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True).unsqueeze(1)
-
+        text = text.cuda(non_blocking=True)
+        fix = fix.cuda(non_blocking=True)
         # # multi-scale training
         # image = F.interpolate(image, size=(new_size, new_size), mode='bilinear')
 

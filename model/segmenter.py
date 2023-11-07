@@ -27,20 +27,11 @@ class CRIS(nn.Module):
         self.proj = Projector(cfg.word_dim, cfg.vis_dim // 2, 3)
 
     def forward(self, img, word, mask=None):
-        '''
-            img: b, 3, h, w
-            word: b, words
-            word_mask: b, words
-            mask: b, 1, h, w
-        '''
         # padding mask used in decoder
         pad_mask = torch.zeros_like(word).masked_fill_(word == 0, 1).bool()
 
-        # vis: C3 / C4 / C5
-        # word: b, length, 1024
-        # state: b, 1024
-        vis = self.backbone.encode_image(img)
-        word, state = self.backbone.encode_text(word)
+        vis = self.backbone.encode_image(img)           #[b, 576, 768]
+        word, state = self.backbone.encode_text(word)   #[b, 77, 768] [n, 768]
 
         # b, 512, 26, 26 (C4)
         fq = self.neck(vis, state)

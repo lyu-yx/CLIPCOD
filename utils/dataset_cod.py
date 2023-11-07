@@ -183,7 +183,7 @@ class CamObjDataset(data.Dataset):
 
         word_vec = tokenize(desc, self.word_length, True).squeeze(0)
 
-        return image, gt, fix, desc
+        return image, gt, fix, word_vec
 
     def filter_files(self):
         assert all(len(lst) == len(self.images) for lst in [self.gts, self.fix, self.desc])

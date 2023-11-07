@@ -11,7 +11,7 @@ DATA:
 TRAIN:
   # Base Arch
   clip_pretrain: pretrain/ViT-L-14-336px.pt
-  input_size: 352
+  input_size: 336
   word_len: 77
   word_dim: 1024
   vis_dim: 512

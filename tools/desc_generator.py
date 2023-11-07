@@ -3,10 +3,10 @@ from glob import glob
 import os
 from tqdm import tqdm
 
-data_root = "dataset\TrainDataset\Imgs"
-target_pth = "dataset\TrainDataset\Desc"
+data_root = "dataset/TrainDataset/Imgs"
+target_pth = "dataset/TrainDataset/Desc"
 
-attr_root = "dataset\TrainDataset\COD_Attr\COD_train"
+attr_root = "dataset/TrainDataset/COD_Attr/COD_train"
 
 
 attr_list = os.listdir(attr_root)
@@ -28,7 +28,8 @@ max_cnt = 0
 
 
 for file in tqdm(file_list):
-    cnt, flg = 0, 0
+    cnt = 0
+    flg = 0
     filename = os.path.basename(file)
     for attr in attr_list:
         search_list = glob(os.path.join(attr_root, attr, "*.jpg"))
@@ -38,12 +39,10 @@ for file in tqdm(file_list):
                 file.write(attr_exp[attr_list.index(attr)])
             flg = 1
             cnt += 1
-        continue
-
+    occ_num[cnt] += 1
     if flg==0:
         with open(os.path.join(target_pth, filename + ".txt"), 'a') as file:
             file.write("Normal Camouflaged object.")
-    occ_num[cnt] += 1
     if cnt > max_cnt:
         max_cnt = cnt 
         max_list.append(file)

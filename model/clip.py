@@ -280,7 +280,13 @@ class Transformer(nn.Module):
         ])
 
     def forward(self, x: torch.Tensor):
-        return self.resblocks(x)
+        middle_feature_maps = []
+        for i, resblock in enumerate(self.resblocks):
+            x = resblock(x)
+            if i in [7, 15, 23]:  
+                middle_feature_maps.append(x)
+        return middle_feature_maps
+        
 
 
 class VisionTransformer(nn.Module):
@@ -304,32 +310,40 @@ class VisionTransformer(nn.Module):
         self.transformer = Transformer(width, layers, heads)
 
         self.ln_post = LayerNorm(width)
-        self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
+        self.proj_0 = nn.Parameter(scale * torch.randn(width, output_dim))
+        self.proj_1 = nn.Parameter(scale * torch.randn(width, output_dim))
+        self.proj_2 = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    def forward(self, x: torch.Tensor):
-        x = self.conv1(x)  # shape = [*, width, grid, grid]
-        x = x.reshape(x.shape[0], x.shape[1],
-                      -1)  # shape = [*, width, grid ** 2]
-        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
+    def forward(self, x: torch.Tensor):                     # x: [2, 3, 352, 352]
+        x = self.conv1(x)  # shape = [*, width, grid, grid]      [2, 1024, 25, 25]
+        x = x.reshape(x.shape[0], x.shape[1],-1)  # shape = [*, width, grid ** 2]       [2, 1024, 625]
+        x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]  [2, 625, 1024]
         x = torch.cat([
             self.class_embedding.to(x.dtype) + torch.zeros(
                 x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device), x
         ],
-                      dim=1)  # shape = [*, grid ** 2 + 1, width]
+                      dim=1)  # shape = [*, grid ** 2 + 1, width]   
         x = x + self.positional_embedding.to(x.dtype)
         x = self.ln_pre(x)
 
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
-        x = x.permute(1, 0, 2)  # LND -> NLD
+        
+        x0 = x[0].permute(1, 0, 2)
+        x1 = x[1].permute(1, 0, 2)
+        x2 = x[2].permute(1, 0, 2)
+        # x = x.permute(1, 0, 2)  # LND -> NLD
 
         # x = self.ln_post(x[:, 0, :])
-        x = self.ln_post(x[:, 1:, :])
-
+        x0 = self.ln_post(x0[:, 1:, :])
+        x1 = self.ln_post(x1[:, 1:, :])
+        x2 = self.ln_post(x2[:, 1:, :])
         if self.proj is not None:
-            x = x @ self.proj
+            x0 = x0 @ self.proj_0
+            x1 = x1 @ self.proj_1
+            x2 = x2 @ self.proj_2
 
-        return x
+        return (x0, x1, x2)
 
 
 class CLIP(nn.Module):
