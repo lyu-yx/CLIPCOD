@@ -249,6 +249,12 @@ class TransformerDecoderLayer(nn.Module):
         vis = vis + self.dropout3(vis2)
         return vis
 
+def d3_to_d4(self, t):
+        n, hw, c = t.size()
+        if hw % 2 != 0:
+            t = t[:, 1:]
+        h = w = int(math.sqrt(hw))
+        return t.transpose(1, 2).reshape(n, c, h, w)
 
 class FPN(nn.Module):
     def __init__(self,
@@ -280,8 +286,12 @@ class FPN(nn.Module):
             conv_layer(out_channels[1], out_channels[1], 3, 1))
 
     def forward(self, imgs, state):
-        # v3, v4, v5: 256, 52, 52 / 512, 26, 26 / 1024, 13, 13
+        # imgs: 3 x [b, 576, 768] state: [b, 768]
         v3, v4, v5 = imgs
+        v3 = d3_to_d4(self, v3) # [b, 768, 24, 24]
+        v4 = d3_to_d4(self, v4)
+        v5 = d3_to_d4(self, v5)
+                
         # fusion 1: b, 1024, 13, 13
         # text projection: b, 1024 -> b, 1024
         state = self.txt_proj(state).unsqueeze(-1).unsqueeze(

@@ -265,7 +265,7 @@ class ResidualAttentionBlock(nn.Module):
         return x
 
 
-class Transformer(nn.Module):
+class Transformer_feats(nn.Module):
     def __init__(self,
                  width: int,
                  layers: int,
@@ -288,6 +288,25 @@ class Transformer(nn.Module):
         return middle_feature_maps
         
 
+class Transformer(nn.Module):
+    def __init__(self,
+                 width: int,
+                 layers: int,
+                 heads: int,
+                 attn_mask: torch.Tensor = None):
+        super().__init__()
+        self.width = width
+        self.layers = layers
+        self.resblocks = nn.Sequential(*[
+            ResidualAttentionBlock(width, heads, attn_mask)
+            for _ in range(layers)
+        ])
+
+    def forward(self, x: torch.Tensor):
+        x = self.resblocks(x)
+        return x
+        
+
 
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution: int, patch_size: int, width: int,
@@ -307,7 +326,7 @@ class VisionTransformer(nn.Module):
             (input_resolution // patch_size)**2 + 1, width))
         self.ln_pre = LayerNorm(width)
 
-        self.transformer = Transformer(width, layers, heads)
+        self.transformer = Transformer_feats(width, layers, heads)
 
         self.ln_post = LayerNorm(width)
         self.proj_0 = nn.Parameter(scale * torch.randn(width, output_dim))
@@ -338,10 +357,10 @@ class VisionTransformer(nn.Module):
         x0 = self.ln_post(x0[:, 1:, :])
         x1 = self.ln_post(x1[:, 1:, :])
         x2 = self.ln_post(x2[:, 1:, :])
-        if self.proj is not None:
-            x0 = x0 @ self.proj_0
-            x1 = x1 @ self.proj_1
-            x2 = x2 @ self.proj_2
+        # if self.proj_0 is not None:
+        x0 = x0 @ self.proj_0
+        x1 = x1 @ self.proj_1
+        x2 = x2 @ self.proj_2
 
         return (x0, x1, x2)
 
@@ -454,7 +473,7 @@ class CLIP(nn.Module):
         x = self.token_embedding(text).type(
             self.dtype)  # [batch_size, n_ctx, d_model]
 
-        x = x + self.positional_embedding.type(self.dtype)[:x.size(1)]
+        x = x + self.positional_embedding.type(self.dtype)[:x.size(1)]  #[2, 77, 768]
         x = x.permute(1, 0, 2)  # NLD -> LND
         x = self.transformer(x)
         x = x.permute(1, 0, 2)  # LND -> NLD
