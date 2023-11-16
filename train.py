@@ -58,8 +58,7 @@ def main():
     args.manual_seed = init_random_seed(args.manual_seed)
     set_random_seed(args.manual_seed, deterministic=False)
 
-    # args.ngpus_per_node = torch.cuda.device_count()
-    args.ngpus_per_node = torch.cuda.device_count() - 1
+    args.ngpus_per_node = torch.cuda.device_count()
     args.world_size = args.ngpus_per_node * args.world_size
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
 
@@ -68,8 +67,7 @@ def main_worker(gpu, args):
     args.output_dir = os.path.join(args.output_folder, args.exp_name)
 
     # local rank & global rank
-    # args.gpu = gpu
-    args.gpu = gpu + 1
+    args.gpu = gpu
     args.rank = args.rank * args.ngpus_per_node + gpu
     torch.cuda.set_device(args.gpu)
 
