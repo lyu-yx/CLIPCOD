@@ -22,7 +22,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 import utils.config as config
 import wandb
 # from utils.dataset import RefDataset
-from model.dataset_cod import CamObjDataset, test_dataset
+from utils.dataset_cod import CamObjDataset, test_dataset
 from engine.engine import train, validate
 from model import build_segmenter
 from utils.misc import (init_random_seed, set_random_seed, setup_logger,
@@ -58,7 +58,8 @@ def main():
     args.manual_seed = init_random_seed(args.manual_seed)
     set_random_seed(args.manual_seed, deterministic=False)
 
-    args.ngpus_per_node = torch.cuda.device_count()
+    # args.ngpus_per_node = torch.cuda.device_count()
+    args.ngpus_per_node = torch.cuda.device_count() - 1
     args.world_size = args.ngpus_per_node * args.world_size
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
 
@@ -67,7 +68,8 @@ def main_worker(gpu, args):
     args.output_dir = os.path.join(args.output_folder, args.exp_name)
 
     # local rank & global rank
-    args.gpu = gpu
+    # args.gpu = gpu
+    args.gpu = gpu + 1
     args.rank = args.rank * args.ngpus_per_node + gpu
     torch.cuda.set_device(args.gpu)
 
@@ -84,16 +86,17 @@ def main_worker(gpu, args):
                             rank=args.rank)
 
     # wandb
-    if args.rank == 0:
-        wandb.init(job_type="training",
-                   mode="online",
-                   config=args,
-                   project="CLIPCOD",
-                   name=args.exp_name,
-                   tags=[args.dataset, args.clip_pretrain])
-    dist.barrier()
+    # if args.rank == 0:
+    #     wandb.init(job_type="training",
+    #                mode="online",
+    #                config=args,
+    #                project="CLIPCOD",
+    #                name=args.exp_name,
+    #                tags=[args.dataset, args.clip_pretrain])
+    dist.barrier(device_ids=[args.gpu])
 
     # build model
+    print("building model")
     model, param_list = build_segmenter(args)
     if args.sync_bn:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
@@ -124,7 +127,6 @@ def main_worker(gpu, args):
                               gt_root=args.val_root + 'GT/',
                               testsize=args.input_size)
     total_step = len(train_data)
-
     # build dataloader
     init_fn = partial(worker_init_fn,
                       num_workers=args.workers,
@@ -133,6 +135,7 @@ def main_worker(gpu, args):
     train_sampler = data.distributed.DistributedSampler(train_data,
                                                         shuffle=True)
     val_sampler = data.distributed.DistributedSampler(val_data, shuffle=False)
+
 
     train_loader = data.DataLoader(train_data,
                                    batch_size=args.batch_size,
@@ -177,6 +180,7 @@ def main_worker(gpu, args):
         train_sampler.set_epoch(epoch_log)
 
         # train
+        print("start training")
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log,
               args)
 

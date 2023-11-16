@@ -24,23 +24,32 @@ class CRIS(nn.Module):
                                           dropout=cfg.dropout,
                                           return_intermediate=cfg.intermediate)
         # Projector
-        self.proj = Projector(cfg.word_dim, cfg.vis_dim // 2, 3)
+        self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
+        self.feats_layer_num = cfg.feats_layer_num
 
     def forward(self, img, word, mask=None):
+        '''
+            img: b, 3, h, w
+            word: b, words
+            word_mask: b, words
+            mask: b, 1, h, w
+        '''
         # padding mask used in decoder
         pad_mask = torch.zeros_like(word).masked_fill_(word == 0, 1).bool()
 
-        vis = self.backbone.encode_image(img)           #[b, 576, 768]
-        word, state = self.backbone.encode_text(word)   #[b, 77, 768] [n, 768]
+        # vis: list: 3 x [b, 576, 768]
+        # word: b, 77, 1024
+        # state: b, 1024
+        vis = self.backbone.encode_image(img)           # list: 3 x [b, 576, 768]
+        word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
 
-        # b, 512, 26, 26 (C4)
+        # b, c, 24, 24
         fq = self.neck(vis, state)
         b, c, h, w = fq.size()
         fq = self.decoder(fq, word, pad_mask)
-        fq = fq.reshape(b, c, h, w)
+        fq = fq.reshape(b, c, h, w)  # [b, c, 24, 24]
 
-        # b, 1, 104, 104
-        pred = self.proj(fq, state)
+        pred = self.proj(fq, state) # [b, c, 96, 96]
 
         if self.training:
             # resize mask

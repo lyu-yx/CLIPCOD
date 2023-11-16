@@ -38,7 +38,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         data_time.update(time.time() - end)
         # data
         image = image.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True).unsqueeze(1)
+        target = target.cuda(non_blocking=True)
         text = text.cuda(non_blocking=True)
         fix = fix.cuda(non_blocking=True)
         # # multi-scale training

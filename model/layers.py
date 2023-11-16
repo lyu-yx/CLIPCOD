@@ -52,7 +52,7 @@ class Projector(nn.Module):
         # visual projector
         self.vis = nn.Sequential(  # os16 -> os4
             nn.Upsample(scale_factor=2, mode='bilinear'),
-            conv_layer(in_dim * 2, in_dim * 2, 3, padding=1),
+            conv_layer(in_dim , in_dim * 2, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_dim * 2, in_dim, 3, padding=1),
             nn.Conv2d(in_dim, in_dim, 1))
@@ -62,14 +62,13 @@ class Projector(nn.Module):
 
     def forward(self, x, word):
         '''
-            x: b, 512, 26, 26
-            word: b, 512
+            x: b, 256, 24, 24
+            word: b, 768
         '''
-        x = self.vis(x)
+        x = self.vis(x) # b, 128, 96, 96
         B, C, H, W = x.size()
-        # 1, b*256, 104, 104
-        x = x.reshape(1, B * C, H, W)
-        # txt: b, (256*3*3 + 1) -> b, 256, 3, 3 / b
+        x = x.reshape(1, B * C, H, W) # 1, b*128, 96, 96
+        # txt: b, (256*3*3 + 1) -> b, 256, 3, 3 / b 
         word = self.txt(word)
         weight, bias = word[:, :-1], word[:, -1]
         weight = weight.reshape(B, C, self.kernel_size, self.kernel_size)
@@ -80,7 +79,7 @@ class Projector(nn.Module):
                        groups=weight.size(0),
                        bias=bias)
         out = out.transpose(0, 1)
-        # b, 1, 104, 104
+        # b, 1, 96, 96
         return out
 
 
@@ -278,7 +277,7 @@ class FPN(nn.Module):
         self.f3_v_proj = conv_layer(in_channels[0], out_channels[0], 3, 1)
         self.f3_cat = conv_layer(out_channels[0] + out_channels[1],
                                  out_channels[1], 1, 0)
-        # fusion 4: f_3 & f_4 & f_5 -> fq: b, 256, 26, 26
+        # fusion 4: f_3 & f_4 & f_5 -> fq: b, 256, 24, 24
         self.f4_proj5 = conv_layer(out_channels[2], out_channels[1], 3, 1)
         self.f4_proj4 = conv_layer(out_channels[1], out_channels[1], 3, 1)
         self.f4_proj3 = conv_layer(out_channels[1], out_channels[1], 3, 1)
@@ -308,7 +307,7 @@ class FPN(nn.Module):
         # out: b, 256, 24, 24
         f3 = self.f3_v_proj(v3)
         f3 = self.f3_cat(torch.cat([f3, f4], dim=1))
-        # fusion 4: b, 512, 13, 13 / b, 512, 26, 26 / b, 512, 26, 26
+        # fusion 4: 3 * [b, 768, 24, 24]
         fq5 = self.f4_proj5(f5)
         fq4 = self.f4_proj4(f4)
         fq3 = self.f4_proj3(f3)
@@ -317,5 +316,5 @@ class FPN(nn.Module):
         fq = torch.cat([fq3, fq4, fq5], dim=1)
         fq = self.aggr(fq)
         fq = self.coordconv(fq)
-        # b, 512, 26, 26
+        # b, 768, 24, 24
         return fq
