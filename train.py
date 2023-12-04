@@ -84,13 +84,13 @@ def main_worker(gpu, args):
                             rank=args.rank)
 
     # wandb
-    # if args.rank == 0:
-    #     wandb.init(job_type="training",
-    #                mode="online",
-    #                config=args,
-    #                project="CLIPCOD",
-    #                name=args.exp_name,
-    #                tags=[args.dataset, args.clip_pretrain])
+    if args.rank == 0:
+        wandb.init(job_type="training",
+                   mode="online",
+                   config=args,
+                   project="CLIPCOD",
+                   name=args.exp_name,
+                   tags=[args.dataset, args.clip_pretrain])
     dist.barrier(device_ids=[args.gpu])
 
     # build model
