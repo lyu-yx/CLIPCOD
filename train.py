@@ -22,7 +22,7 @@ from torch.optim.lr_scheduler import MultiStepLR
 import utils.config as config
 import wandb
 # from utils.dataset import RefDataset
-from utils.dataset_cod import CamObjDataset, test_dataset
+from utils.dataset_cod import CamObjDataset, TestDataset
 from engine.engine import train, validate
 from model import build_segmenter
 from utils.misc import (init_random_seed, set_random_seed, setup_logger,
@@ -121,7 +121,7 @@ def main_worker(gpu, args):
                               desc_root=args.train_root + 'Desc/',
                               trainsize=args.input_size,
                               word_length=args.word_len)
-    val_data = test_dataset(image_root=args.val_root + 'Imgs/',
+    val_data = TestDataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
                               testsize=args.input_size)
     total_step = len(train_data)
@@ -182,26 +182,27 @@ def main_worker(gpu, args):
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log,
               args)
 
-        # evaluation
-        iou, prec_dict = validate(val_loader, model, epoch_log, args)
+        # evaluation & save
+        # if epoch > args.epochs//2:
+        validate(val_loader, model, epoch, args)
 
-        # save model
-        if dist.get_rank() == 0:
-            lastname = os.path.join(args.output_dir, "last_model.pth")
-            torch.save(
-                {
-                    'epoch': epoch_log,
-                    'cur_iou': iou,
-                    'best_iou': best_IoU,
-                    'prec': prec_dict,
-                    'state_dict': model.state_dict(),
-                    'optimizer': optimizer.state_dict(),
-                    'scheduler': scheduler.state_dict()
-                }, lastname)
-            if iou >= best_IoU:
-                best_IoU = iou
-                bestname = os.path.join(args.output_dir, "best_model.pth")
-                shutil.copyfile(lastname, bestname)
+        # # save model
+        # if dist.get_rank() == 0:
+        #     lastname = os.path.join(args.output_dir, "last_model.pth")
+        #     torch.save(
+        #         {
+        #             'epoch': epoch_log,
+        #             'cur_iou': iou,
+        #             'best_iou': best_IoU,
+        #             'prec': prec_dict,
+        #             'state_dict': model.state_dict(),
+        #             'optimizer': optimizer.state_dict(),
+        #             'scheduler': scheduler.state_dict()
+        #         }, lastname)
+        #     if iou >= best_IoU:
+        #         best_IoU = iou
+        #         bestname = os.path.join(args.output_dir, "best_model.pth")
+        #         shutil.copyfile(lastname, bestname)
 
         # update lr
         scheduler.step(epoch_log)

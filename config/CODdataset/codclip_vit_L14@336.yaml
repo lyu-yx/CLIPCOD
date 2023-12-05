@@ -55,5 +55,6 @@ Distributed:
   rank: 0
 TEST:
   test_split: val-test
+  save_pth: pretrain
   # test_lmdb: datasets/lmdb/refcoco/val.lmdb
   visualize: False

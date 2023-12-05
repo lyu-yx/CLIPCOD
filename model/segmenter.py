@@ -3,11 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.clip import build_model
-
+from utils.losses import structure_loss
 from .layers import FPN, Projector, TransformerDecoder
 
 
-class CRIS(nn.Module):
+class CLIPCOD(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         # Vision & Text Encoder
@@ -56,7 +56,7 @@ class CRIS(nn.Module):
             if pred.shape[-2:] != mask.shape[-2:]:
                 mask = F.interpolate(mask, pred.shape[-2:],
                                      mode='nearest').detach()
-            loss = F.binary_cross_entropy_with_logits(pred, mask)
+            loss = structure_loss(pred, mask)
             return pred.detach(), mask, loss
         else:
             return pred.detach()

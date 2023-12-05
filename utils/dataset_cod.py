@@ -233,39 +233,71 @@ def get_loader(image_root, gt_root, edge_root, batchsize, trainsize,
 
 
 # test dataset and loader
-class test_dataset:
-    def __init__(self, image_root, gt_root, testsize):
-        self.testsize = testsize
-        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg') or f.endswith('.png')]
-        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.tif') or f.endswith('.png')]
+class TestDataset(data.Dataset):
+    def __init__(self, image_root, gt_root, desc_root, trainsize, word_length):
+        self.trainsize = trainsize
+        self.word_length = word_length
+        # get filenames
+        self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg')
+                       or f.endswith('.png')]
+        self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.jpg')
+                    or f.endswith('.png')]
+        self.desc = [desc_root + f for f in os.listdir(desc_root) if f.endswith('.txt')]
+
+        # sorted files
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
-        self.transform = transforms.Compose([
-            transforms.Resize((self.testsize, self.testsize)),
+        self.desc = sorted(self.desc)
+
+        # filter mathcing degrees of files
+        self.filter_files()
+
+        # transforms
+        self.img_transform = transforms.Compose([
+            transforms.Resize((self.trainsize, self.trainsize)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
-        self.gt_transform = transforms.ToTensor()
+        self.gt_transform = transforms.Compose([
+            transforms.Resize((self.trainsize, self.trainsize)),
+            transforms.ToTensor()])
+        # get size of dataset
         self.size = len(self.images)
-        self.index = 0
+        print('>>> trainig/validing with {} samples'.format(self.size))
 
-    def load_data(self):
-        image = self.rgb_loader(self.images[self.index])
-        image = self.transform(image).unsqueeze(0)
+    def __getitem__(self, index):
+        # read assest/gts/fix/desc
+        image = self.rgb_loader(self.images[index])
+        gt = self.binary_loader(self.gts[index])
+        with open(self.desc[index], 'r') as file:
+                desc = file.read()
 
-        gt = self.binary_loader(self.gts[self.index])
+        # data augumentation
+        image, gt = cv_random_flip(image, gt)
+        image, gt = randomCrop(image, gt)
+        image, gt = randomRotation(image, gt)
 
-        name = self.images[self.index].split('/')[-1]
+        image = colorEnhance(image)
+        gt = randomPeper(gt)
+        
+        image = self.img_transform(image)
+        gt = self.gt_transform(gt)
 
-        image_for_post = self.rgb_loader(self.images[self.index])
-        image_for_post = image_for_post.resize(gt.size)
+        word_vec = tokenize(desc, self.word_length, True).squeeze(0)
 
-        if name.endswith('.jpg'):
-            name = name.split('.jpg')[0] + '.png'
+        return image, gt, word_vec
 
-        self.index += 1
-        self.index = self.index % self.size
-
-        return image, gt, name, np.array(image_for_post)
+    def filter_files(self):
+        assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])
+        images, gts, desc = [], [], [], []
+        for img_pth, gt_pth, desc_pth in zip(self.images, self.gts, self.desc):
+            img = Image.open(img_pth)
+            gt = Image.open(gt_pth)
+            
+            if img.size == gt.size:
+                images.append(img_pth)
+                gts.append(gt_pth)
+        self.images = images
+        self.gts = gts
 
     def rgb_loader(self, path):
         with open(path, 'rb') as f:
@@ -284,3 +316,4 @@ class test_dataset:
 
     def __len__(self):
         return self.size
+

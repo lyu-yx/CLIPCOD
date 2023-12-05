@@ -1,4 +1,4 @@
-from .segmenter import CRIS
+from .segmenter import CLIPCOD
 from loguru import logger
 
 # def build_segmenter(args):
@@ -30,7 +30,7 @@ from loguru import logger
 
 
 def build_segmenter(args):
-    model = CRIS(args)
+    model = CLIPCOD(args)
     backbone = []
     head = []
     for k, v in model.named_parameters():
