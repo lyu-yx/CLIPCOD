@@ -123,6 +123,7 @@ def main_worker(gpu, args):
                               word_length=args.word_len)
     val_data = TestDataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
+                              desc_root=args.val_root + 'Desc/',
                               testsize=args.input_size)
     total_step = len(train_data)
     # build dataloader
