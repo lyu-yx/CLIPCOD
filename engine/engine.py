@@ -92,6 +92,7 @@ def val(test_loader, model, epoch, args):
     validation function
     """
     global best_metric_dict, best_score, best_epoch
+    best_score, best_epoch = 0, 0
     FM = Measure.Fmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()
@@ -105,8 +106,8 @@ def val(test_loader, model, epoch, args):
             desc = desc.cuda(non_blocking=True)
             res = model(image, desc)
 
-            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
-            res = res.sigmoid().data.cpu().numpy().squeeze()
+            res = F.upsample(res, size=gt.shape[-2:], mode='bilinear', align_corners=False)
+            res = res.sigmoid().data.cpu().numpy()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 
             FM.step(pred=res, gt=gt)
