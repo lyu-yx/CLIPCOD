@@ -295,7 +295,6 @@ class Transformer(nn.Module):
                  width: int,
                  layers: int,
                  heads: int,
-                 feats_layer_num: list,
                  attn_mask: torch.Tensor = None):
         super().__init__()
         self.width = width
