@@ -270,6 +270,7 @@ class Transformer_feats(nn.Module):
                  width: int,
                  layers: int,
                  heads: int,
+                 feats_layer_num: list,
                  attn_mask: torch.Tensor = None):
         super().__init__()
         self.width = width
@@ -278,12 +279,13 @@ class Transformer_feats(nn.Module):
             ResidualAttentionBlock(width, heads, attn_mask)
             for _ in range(layers)
         ])
+        self.feats_layer_num = feats_layer_num
 
     def forward(self, x: torch.Tensor):
         middle_feature_maps = []
         for i, resblock in enumerate(self.resblocks):
             x = resblock(x)
-            if i in [7, 15, 23]:  
+            if i in self.feats_layer_num:  
                 middle_feature_maps.append(x)
         return middle_feature_maps
         
@@ -293,6 +295,7 @@ class Transformer(nn.Module):
                  width: int,
                  layers: int,
                  heads: int,
+                 feats_layer_num: list,
                  attn_mask: torch.Tensor = None):
         super().__init__()
         self.width = width
@@ -310,7 +313,7 @@ class Transformer(nn.Module):
 
 class VisionTransformer(nn.Module):
     def __init__(self, input_resolution: int, patch_size: int, width: int,
-                 layers: int, heads: int, output_dim: int):
+                 layers: int, heads: int, output_dim: int, feats_layer_num: list):
         super().__init__()
         self.input_resolution = input_resolution
         self.output_dim = output_dim
@@ -326,7 +329,7 @@ class VisionTransformer(nn.Module):
             (input_resolution // patch_size)**2 + 1, width))
         self.ln_pre = LayerNorm(width)
 
-        self.transformer = Transformer_feats(width, layers, heads)
+        self.transformer = Transformer_feats(width, layers, heads, feats_layer_num)
 
         self.ln_post = LayerNorm(width)
         self.proj_0 = nn.Parameter(scale * torch.randn(width, output_dim))
@@ -374,6 +377,7 @@ class CLIP(nn.Module):
             vision_layers: Union[Tuple[int, int, int, int], int],
             vision_width: int,
             vision_patch_size: int,
+            feats_layer_num: list,
             # text
             context_length: int,
             txt_length: int,
@@ -399,7 +403,8 @@ class CLIP(nn.Module):
                                             width=vision_width,
                                             layers=vision_layers,
                                             heads=vision_heads,
-                                            output_dim=embed_dim)
+                                            output_dim=embed_dim,
+                                            feats_layer_num=feats_layer_num)
 
         self.transformer = Transformer(
             width=transformer_width,
@@ -533,7 +538,7 @@ def convert_weights(model: nn.Module):
     model.apply(_convert_weights_to_fp16)
 
 
-def build_model(state_dict: dict, txt_length: int):
+def build_model(state_dict: dict, txt_length: int, feats_layer_num: list):
     vit = "visual.proj" in state_dict
 
     if vit:
@@ -575,7 +580,7 @@ def build_model(state_dict: dict, txt_length: int):
             if k.startswith(f"transformer.resblocks")))
 
     model = CLIP(embed_dim, image_resolution, vision_layers, vision_width,
-                 vision_patch_size, context_length, txt_length, vocab_size,
+                 vision_patch_size, feats_layer_num, context_length, txt_length, vocab_size,
                  transformer_width, transformer_heads, transformer_layers)
 
     for key in ["input_resolution", "context_length", "vocab_size"]:

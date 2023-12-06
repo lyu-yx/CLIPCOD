@@ -13,7 +13,7 @@ class CLIPCOD(nn.Module):
         # Vision & Text Encoder
         clip_model = torch.jit.load(cfg.clip_pretrain,
                                     map_location="cpu").eval()
-        self.backbone = build_model(clip_model.state_dict(), cfg.word_len).float()
+        self.backbone = build_model(clip_model.state_dict(), cfg.word_len, cfg.feats_layer_num).float()
         # Multi-Modal FPN
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
         # Decoder
@@ -25,7 +25,7 @@ class CLIPCOD(nn.Module):
                                           return_intermediate=cfg.intermediate)
         # Projector
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
-        self.feats_layer_num = cfg.feats_layer_num
+        
 
     def forward(self, img, word, mask=None):
         '''
