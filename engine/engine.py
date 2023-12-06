@@ -87,8 +87,6 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                     step=epoch * len(train_loader) + (i + 1))
 
 
-
-@torch.no_grad()
 def val(test_loader, model, epoch, args):
     """
     validation function
@@ -101,14 +99,13 @@ def val(test_loader, model, epoch, args):
 
     model.eval()
     with torch.no_grad():
-        for i in range(test_loader.size):
-            image, gt, _, _ = test_loader.load_data()
+        for i, (image, gt, desc) in enumerate(test_loader):
             gt = np.asarray(gt, np.float32)
-            image = image.cuda()
+            image = image.cuda(non_blocking=True)
+            desc = desc.cuda(non_blocking=True)
+            res = model(image, desc)
 
-            res = model(image)
-
-            res = F.upsample(res[0][3], size=gt.shape, mode='bilinear', align_corners=False)
+            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 

@@ -23,7 +23,7 @@ import utils.config as config
 import wandb
 # from utils.dataset import RefDataset
 from utils.dataset_cod import CamObjDataset, TestDataset
-from engine.engine import train, validate
+from engine.engine import train, val
 from model import build_segmenter
 from utils.misc import (init_random_seed, set_random_seed, setup_logger,
                         worker_init_fn)
@@ -185,7 +185,7 @@ def main_worker(gpu, args):
 
         # evaluation & save
         # if epoch > args.epochs//2:
-        validate(val_loader, model, epoch, args)
+        val(val_loader, model, epoch, args)
 
         # # save model
         # if dist.get_rank() == 0:
