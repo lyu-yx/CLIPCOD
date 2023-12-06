@@ -274,7 +274,7 @@ class TestDataset(data.Dataset):
         # data augumentation
         image, gt, _ = cv_random_flip(image, gt, gt)
         image, gt, _ = randomCrop(image, gt, gt)
-        image, gt, _ = randomRotation(image, , gt)
+        image, gt, _ = randomRotation(image, gt, gt)
 
         image = colorEnhance(image)
         gt = randomPeper(gt)
