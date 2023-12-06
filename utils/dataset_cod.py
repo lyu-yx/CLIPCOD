@@ -272,9 +272,9 @@ class TestDataset(data.Dataset):
                 desc = file.read()
 
         # data augumentation
-        image, gt = cv_random_flip(image, gt)
-        image, gt = randomCrop(image, gt)
-        image, gt = randomRotation(image, gt)
+        image, gt, _ = cv_random_flip(image, gt, gt)
+        image, gt, _ = randomCrop(image, gt, gt)
+        image, gt, _ = randomRotation(image, , gt)
 
         image = colorEnhance(image)
         gt = randomPeper(gt)
@@ -288,7 +288,7 @@ class TestDataset(data.Dataset):
 
     def filter_files(self):
         assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])
-        images, gts, desc = [], [], [], []
+        images, gts, desc = [], [], []
         for img_pth, gt_pth, desc_pth in zip(self.images, self.gts, self.desc):
             img = Image.open(img_pth)
             gt = Image.open(gt_pth)
