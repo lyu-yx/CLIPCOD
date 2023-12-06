@@ -132,8 +132,7 @@ def main_worker(gpu, args):
                       num_workers=args.workers,
                       rank=args.rank,
                       seed=args.manual_seed)
-    train_sampler = data.distributed.DistributedSampler(train_data,
-                                                        shuffle=True)
+    train_sampler = data.distributed.DistributedSampler(train_data, shuffle=True)
     val_sampler = data.distributed.DistributedSampler(val_data, shuffle=False)
 
 
@@ -152,7 +151,7 @@ def main_worker(gpu, args):
                                  pin_memory=True,
                                  sampler=val_sampler,
                                  drop_last=False)
-    best_IoU = 0.0
+    
     # resume
     if args.resume:
         if os.path.isfile(args.resume):
@@ -214,7 +213,7 @@ def main_worker(gpu, args):
     if dist.get_rank() == 0:
         wandb.finish()
 
-    logger.info("* Best IoU={} * ".format(best_IoU))
+    # logger.info("* Best IoU={} * ".format(best_IoU))
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))
     logger.info('* Training time {} *'.format(total_time_str))
