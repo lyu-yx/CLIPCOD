@@ -124,7 +124,8 @@ def main_worker(gpu, args):
     val_data = TestDataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
                               desc_root=args.val_root + 'Desc/',
-                              testsize=args.input_size)
+                              testsize=args.input_size,
+                              word_length=args.word_len)
     total_step = len(train_data)
     # build dataloader
     init_fn = partial(worker_init_fn,

@@ -234,8 +234,8 @@ def get_loader(image_root, gt_root, edge_root, batchsize, trainsize,
 
 # test dataset and loader
 class TestDataset(data.Dataset):
-    def __init__(self, image_root, gt_root, desc_root, trainsize, word_length):
-        self.trainsize = trainsize
+    def __init__(self, image_root, gt_root, desc_root, testsize, word_length):
+        self.testsize = testsize
         self.word_length = word_length
         # get filenames
         self.images = [image_root + f for f in os.listdir(image_root) if f.endswith('.jpg')
@@ -254,11 +254,11 @@ class TestDataset(data.Dataset):
 
         # transforms
         self.img_transform = transforms.Compose([
-            transforms.Resize((self.trainsize, self.trainsize)),
+            transforms.Resize((self.testsize, self.testsize)),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
         self.gt_transform = transforms.Compose([
-            transforms.Resize((self.trainsize, self.trainsize)),
+            transforms.Resize((self.testsize, self.testsize)),
             transforms.ToTensor()])
         # get size of dataset
         self.size = len(self.images)
