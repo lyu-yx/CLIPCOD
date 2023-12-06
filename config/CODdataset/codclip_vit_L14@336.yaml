@@ -31,9 +31,9 @@ TRAIN:
   epochs: 50
   milestones: [35]
   start_epoch: 0
-  batch_size: 8  # batch size for training
+  batch_size: 32  # batch size for training
   batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
-  base_lr: 0.0001
+  base_lr: 1e-4
   lr_decay: 0.1
   lr_multi: 0.1
   weight_decay: 0.
@@ -55,6 +55,6 @@ Distributed:
   rank: 0
 TEST:
   test_split: val-test
-  save_path: pretrain
+  save_path: pretrain/
   # test_lmdb: datasets/lmdb/refcoco/val.lmdb
   visualize: False
