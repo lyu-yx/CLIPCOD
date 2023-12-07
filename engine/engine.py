@@ -92,8 +92,6 @@ def val(test_loader, model, epoch, args):
     """
     validation function
     """
-    global best_metric_dict, best_score, best_epoch
-    
     FM = Measure.Fmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()

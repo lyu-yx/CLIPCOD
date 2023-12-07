@@ -172,8 +172,11 @@ def main_worker(gpu, args):
 
     # start training
     start_time = time.time()
+    
     # global record
+    global best_score, best_epoch
     best_score, best_epoch = 0, 0
+    
     for epoch in range(args.start_epoch, args.epochs):
         epoch_log = epoch + 1
 
