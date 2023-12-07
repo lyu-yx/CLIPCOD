@@ -48,13 +48,13 @@ def main():
     # build model
     model, _ = build_segmenter(args)
     model = torch.nn.DataParallel(model).cuda()
-    logger.info(model)
+    
 
     args.model_dir = os.path.join(args.output_dir, "Net_epoch_best.pth")
     if os.path.isfile(args.model_dir):
         logger.info("=> loading checkpoint '{}'".format(args.model_dir))
         checkpoint = torch.load(args.model_dir)
-        model.load_state_dict(checkpoint['state_dict'], strict=True)
+        model.load_state_dict(checkpoint, strict=True)
         logger.info("=> loaded checkpoint '{}'".format(args.model_dir))
     else:
         raise ValueError(

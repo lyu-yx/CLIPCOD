@@ -4,7 +4,7 @@ DATA:
   dataset: CODtraindataset
   model_save_path: pretrain/
   save_map: True
-  map_save_path: result/
+  map_save_path: exp/
   exp_name: blank_with_nofix
   test_dataset: ['CHAMELEON', 'CAMO', 'COD10K', 'NC4K']
 
@@ -32,7 +32,7 @@ TRAIN:
   milestones: [35, 75]
   start_epoch: 0
   batch_size: 12  # batch size for training
-  batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
+  batch_size_val: 4  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.0001
   lr_decay: 0.2
   lr_multi: 0.1
