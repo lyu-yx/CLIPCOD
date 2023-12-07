@@ -172,6 +172,8 @@ def main_worker(gpu, args):
 
     # start training
     start_time = time.time()
+    # global record
+    best_score, best_epoch = 0, 0
     for epoch in range(args.start_epoch, args.epochs):
         epoch_log = epoch + 1
 
@@ -180,34 +182,18 @@ def main_worker(gpu, args):
 
         # train
         print("start training")
-        train(train_loader, model, optimizer, scheduler, scaler, epoch_log,
-              args)
+        train(train_loader, model, optimizer, scheduler, scaler, epoch_log, args)
 
         # evaluation & save
         # if epoch > args.epochs//2:
         val(val_loader, model, epoch, args)
 
-        # # save model
-        # if dist.get_rank() == 0:
-        #     lastname = os.path.join(args.output_dir, "last_model.pth")
-        #     torch.save(
-        #         {
-        #             'epoch': epoch_log,
-        #             'cur_iou': iou,
-        #             'best_iou': best_IoU,
-        #             'prec': prec_dict,
-        #             'state_dict': model.state_dict(),
-        #             'optimizer': optimizer.state_dict(),
-        #             'scheduler': scheduler.state_dict()
-        #         }, lastname)
-        #     if iou >= best_IoU:
-        #         best_IoU = iou
-        #         bestname = os.path.join(args.output_dir, "best_model.pth")
-        #         shutil.copyfile(lastname, bestname)
-
         # update lr
         scheduler.step(epoch_log)
-        torch.cuda.empty_cache()
+
+        # cache cleaning
+        if args.clean_cache:
+            torch.cuda.empty_cache()
 
     time.sleep(2)
     if dist.get_rank() == 0:

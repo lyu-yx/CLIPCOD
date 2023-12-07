@@ -284,7 +284,11 @@ class TestDataset(data.Dataset):
 
         word_vec = tokenize(desc, self.word_length, True).squeeze(0)
 
-        return image, gt, word_vec
+        name = self.images[self.index].split('/')[-1]
+        if name.endswith('.jpg'):
+            name = name.split('.jpg')[0] + '.png'
+
+        return image, gt, word_vec, name
 
     def filter_files(self):
         assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])

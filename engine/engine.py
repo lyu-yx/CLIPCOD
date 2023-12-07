@@ -8,6 +8,7 @@ import torch.cuda.amp as amp
 import torch.distributed as dist
 import torch.nn.functional as F
 import wandb
+import matplotlib.pyplot as plt
 import logging
 from loguru import logger
 from utils.dataset import tokenize
@@ -92,7 +93,7 @@ def val(test_loader, model, epoch, args):
     validation function
     """
     global best_metric_dict, best_score, best_epoch
-    best_score, best_epoch = 0, 0
+    
     FM = Measure.Fmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()
@@ -100,7 +101,7 @@ def val(test_loader, model, epoch, args):
 
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, desc) in enumerate(test_loader):
+        for i, (image, gt, desc, _) in enumerate(test_loader):
             gt = np.asarray(gt, np.float32)
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
@@ -131,7 +132,7 @@ def val(test_loader, model, epoch, args):
                 best_metric_dict = metrics_dict
                 best_score = cur_score
                 best_epoch = epoch
-                torch.save(model.state_dict(), args.save_path + 'Net_epoch_best.pth')
+                torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
                 print('>>> save state_dict successfully! best epoch is {}.'.format(epoch))
             else:
                 print('>>> not find the best epoch -> continue training ...')
@@ -144,129 +145,43 @@ def val(test_loader, model, epoch, args):
 
 
 
-@torch.no_grad()
-def validate(val_loader, model, epoch, args):
-    iou_list = []
+def test(test_loader, model, cur_dataset, args):
+    """
+    validation function
+    """
+    global best_metric_dict, best_score, best_epoch
+    
+    WFM = Measure.WeightedFmeasure()
+    SM = Measure.Smeasure()
+    EM = Measure.Emeasure()
+    MAE = Measure.MAE()
+    
     model.eval()
-    time.sleep(2)
-    for imgs, texts, param in val_loader:
-        # data
-        imgs = imgs.cuda(non_blocking=True)
-        texts = texts.cuda(non_blocking=True)
-        # inference
-        preds = model(imgs, texts)
-        preds = torch.sigmoid(preds)
-        if preds.shape[-2:] != imgs.shape[-2:]:
-            preds = F.interpolate(preds,
-                                  size=imgs.shape[-2:],
-                                  mode='bicubic',
-                                  align_corners=True).squeeze(1)
-        # process one batch
-        for pred, mask_dir, mat, ori_size in zip(preds, param['mask_dir'],
-                                                 param['inverse'],
-                                                 param['ori_size']):
-            h, w = np.array(ori_size)
-            mat = np.array(mat)
-            pred = pred.cpu().numpy()
-            pred = cv2.warpAffine(pred, mat, (w, h),
-                                  flags=cv2.INTER_CUBIC,
-                                  borderValue=0.)
-            pred = np.array(pred > 0.35)
-            mask = cv2.imread(mask_dir, flags=cv2.IMREAD_GRAYSCALE)
-            mask = mask / 255.
-            # iou
-            inter = np.logical_and(pred, mask)
-            union = np.logical_or(pred, mask)
-            iou = np.sum(inter) / (np.sum(union) + 1e-6)
-            iou_list.append(iou)
-    iou_list = np.stack(iou_list)
-    iou_list = torch.from_numpy(iou_list).to(imgs.device)
-    iou_list = concat_all_gather(iou_list)
-    prec_list = []
-    for thres in torch.arange(0.5, 1.0, 0.1):
-        tmp = (iou_list > thres).float().mean()
-        prec_list.append(tmp)
-    iou = iou_list.mean()
-    prec = {}
-    temp = '  '
-    for i, thres in enumerate(range(5, 10)):
-        key = 'Pr@{}'.format(thres * 10)
-        value = prec_list[i].item()
-        prec[key] = value
-        temp += "{}: {:.2f}  ".format(key, 100. * value)
-    head = 'Evaluation: Epoch=[{}/{}]  IoU={:.2f}'.format(
-        epoch, args.epochs, 100. * iou.item())
-    logger.info(head + temp)
-    return iou.item(), prec
+    with torch.no_grad():
+        for i, (image, gt, desc, name) in tqdm(enumerate(test_loader)):
+            gt = gt.numpy().astype(np.float32).squeeze()
+            gt /= (gt.max() + 1e-8)
+            image = image.cuda(non_blocking=True)
+            desc = desc.cuda(non_blocking=True)
+            res = model(image, desc)
 
+            res = F.upsample(res, size=gt.shape[-2:], mode='bilinear', align_corners=False)
+            res = res.sigmoid().data.cpu().numpy()
+            res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+            
+            # save image
+            if args.save_map:
+                map_save_path = os.path.join(args.map_save_path, cur_dataset)
+                os.makedirs(map_save_path, exist_ok=True)
+                plt.imsave(map_save_path + str(name).split('.')[0] + '.png', res, cmap='gist_gray') 
+            WFM.step(pred=res*255, gt=gt*255)
+            SM.step(pred=res*255, gt=gt*255)
+            EM.step(pred=res*255, gt=gt*255)
+            MAE.step(pred=res*255, gt=gt*255)
 
-@torch.no_grad()
-def inference(test_loader, model, args):
-    iou_list = []
-    tbar = tqdm(test_loader, desc='Inference:', ncols=100)
-    model.eval()
-    time.sleep(2)
-    for img, param in tbar:
-        # data
-        img = img.cuda(non_blocking=True)
-        mask = cv2.imread(param['mask_dir'][0], flags=cv2.IMREAD_GRAYSCALE)
-        # dump image & mask
-        if args.visualize:
-            seg_id = param['seg_id'][0].cpu().numpy()
-            img_name = '{}-img.jpg'.format(seg_id)
-            mask_name = '{}-mask.png'.format(seg_id)
-            cv2.imwrite(filename=os.path.join(args.vis_dir, img_name),
-                        img=param['ori_img'][0].cpu().numpy())
-            cv2.imwrite(filename=os.path.join(args.vis_dir, mask_name),
-                        img=mask)
-        # multiple sentences
-        for sent in param['sents']:
-            mask = mask / 255.
-            text = tokenize(sent, args.word_len, True)
-            text = text.cuda(non_blocking=True)
-            # inference
-            pred = model(img, text)
-            pred = torch.sigmoid(pred)
-            if pred.shape[-2:] != img.shape[-2:]:
-                pred = F.interpolate(pred,
-                                     size=img.shape[-2:],
-                                     mode='bicubic',
-                                     align_corners=True).squeeze()
-            # process one sentence
-            h, w = param['ori_size'].numpy()[0]
-            mat = param['inverse'].numpy()[0]
-            pred = pred.cpu().numpy()
-            pred = cv2.warpAffine(pred, mat, (w, h),
-                                  flags=cv2.INTER_CUBIC,
-                                  borderValue=0.)
-            pred = np.array(pred > 0.35)
-            # iou
-            inter = np.logical_and(pred, mask)
-            union = np.logical_or(pred, mask)
-            iou = np.sum(inter) / (np.sum(union) + 1e-6)
-            iou_list.append(iou)
-            # dump prediction
-            if args.visualize:
-                pred = np.array(pred*255, dtype=np.uint8)
-                sent = "_".join(sent[0].split(" "))
-                pred_name = '{}-iou={:.2f}-{}.png'.format(seg_id, iou*100, sent)
-                cv2.imwrite(filename=os.path.join(args.vis_dir, pred_name),
-                            img=pred)
-    logger.info('=> Metric Calculation <=')
-    iou_list = np.stack(iou_list)
-    iou_list = torch.from_numpy(iou_list).to(img.device)
-    prec_list = []
-    for thres in torch.arange(0.5, 1.0, 0.1):
-        tmp = (iou_list > thres).float().mean()
-        prec_list.append(tmp)
-    iou = iou_list.mean()
-    prec = {}
-    for i, thres in enumerate(range(5, 10)):
-        key = 'Pr@{}'.format(thres*10)
-        value = prec_list[i].item()
-        prec[key] = value
-    logger.info('IoU={:.2f}'.format(100.*iou.item()))
-    for k, v in prec.items():
-        logger.info('{}: {:.2f}.'.format(k, 100.*v))
+        sm = SM.get_results()['sm'].round(3)
+        adpem = EM.get_results()['em']['adp'].round(3)
+        wfm = WFM.get_results()['wfm'].round(3)
+        mae = MAE.get_results()['mae'].round(3)
 
-    return iou.item(), prec
+    return {'Sm':sm, 'adpE':adpem, 'wF':wfm, 'M':mae}

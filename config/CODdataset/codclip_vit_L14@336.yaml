@@ -1,13 +1,12 @@
 DATA:
   train_root: dataset/TrainDataset/
-  val_root: dataset/TestDataset/CAMO/
+  test_root: dataset/TestDataset/
   dataset: CODtraindataset
-  # dataset: refcoco
-  # train_lmdb: datasets/lmdb/refcoco/train.lmdb
-  # train_split: train
-  # val_lmdb: datasets/lmdb/refcoco/val.lmdb
-  # val_split: val
-  # mask_root: datasets/masks/refcoco
+  model_save_path: pretrain/
+  save_map: True
+  map_save_path: result/
+  test_dataset: ['CHAMELEON', 'CAMO', 'COD10K', 'NC4K']
+
 TRAIN:
   # Base Arch
   clip_pretrain: pretrain/ViT-L-14-336px.pt
@@ -28,13 +27,13 @@ TRAIN:
   # Training Setting
   workers: 32  # data loader workers
   workers_val: 16
-  epochs: 50
-  milestones: [35]
+  epochs: 100
+  milestones: [35, 75]
   start_epoch: 0
-  batch_size: 24  # batch size for training
+  batch_size: 12  # batch size for training
   batch_size_val: 8  # batch size for validation during training, memory and speed tradeoff
   base_lr: 0.0001
-  lr_decay: 0.1
+  lr_decay: 0.2
   lr_multi: 0.1
   weight_decay: 0.
   max_norm: 0.
@@ -47,14 +46,15 @@ TRAIN:
   weight:  # path to initial weight (default: none)
   resume:  # path to latest checkpoint (default: none)
   evaluate: True  # evaluate on validation set, extra gpu memory needed and small batch_size_val is recommend
+  clean_cache: False  # clean cache after each epoch
+
 Distributed:
   dist_url: tcp://localhost:3681
   dist_backend: 'nccl'
   multiprocessing_distributed: True
   world_size: 1
   rank: 0
+
 TEST:
   test_split: val-test
-  save_path: pretrain/
-  # test_lmdb: datasets/lmdb/refcoco/val.lmdb
   visualize: False
