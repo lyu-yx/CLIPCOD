@@ -22,7 +22,7 @@ def get_parser():
     parser = argparse.ArgumentParser(
         description='Pytorch Referring Expression Segmentation')
     parser.add_argument('--config',
-                        default='path to xxx.yaml',
+                        default='config/CODdataset/codclip_vit_L14@336.yaml',
                         type=str,
                         help='config file')
     parser.add_argument('--opts',
@@ -40,7 +40,7 @@ def get_parser():
 @logger.catch
 def main():
     args = get_parser()
-    args.output_dir = os.path.join(args.output_folder, args.exp_name)
+    args.output_dir = os.path.join(args.map_save_path, args.exp_name)
     if args.visualize:
         args.vis_dir = os.path.join(args.output_dir, "vis")
         os.makedirs(args.vis_dir, exist_ok=True)

@@ -5,6 +5,7 @@ DATA:
   model_save_path: pretrain/
   save_map: True
   map_save_path: result/
+  exp_name: blank_with_nofix
   test_dataset: ['CHAMELEON', 'CAMO', 'COD10K', 'NC4K']
 
 TRAIN:
@@ -40,8 +41,6 @@ TRAIN:
   manual_seed: 0
   print_freq: 100
   # Resume & Save
-  exp_name: COD_vit_L14@336
-  output_folder: exp/CODtraindataset
   save_freq: 1
   weight:  # path to initial weight (default: none)
   resume:  # path to latest checkpoint (default: none)

@@ -64,7 +64,7 @@ def main():
 
 
 def main_worker(gpu, args):
-    args.output_dir = os.path.join(args.output_folder, args.exp_name)
+    args.output_dir = os.path.join(args.map_save_path, args.exp_name)
 
     # local rank & global rank
     args.gpu = gpu
