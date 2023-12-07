@@ -173,7 +173,7 @@ def test(test_loader, model, cur_dataset, args):
             if args.save_map:
                 map_save_path = os.path.join(args.map_save_path, cur_dataset)
                 os.makedirs(map_save_path, exist_ok=True)
-                plt.imsave(map_save_path + str(name).split('.')[0] + '.png', res, cmap='gist_gray') 
+                plt.imsave(map_save_path + '/' + str(name).split('.')[0][2:] + '.png', res, cmap='gist_gray') 
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
             EM.step(pred=res*255, gt=gt*255)
