@@ -65,20 +65,19 @@ def main():
     for cur_dataset in args.test_dataset:
         test_root = os.path.join(args.test_root, cur_dataset)
         print(f"Loading {cur_dataset}...")
-        test_data = TestDataset(image_root=test_root + 'Imgs/',
-                                gt_root=test_root + 'GT/',
-                                desc_root=test_root + 'Desc/',
+        test_data = TestDataset(image_root=test_root + '/Imgs/',
+                                gt_root=test_root + '/GT/',
+                                desc_root=test_root + '/Desc/',
                                 testsize=args.input_size,
                                 word_length=args.word_len)
         
-        test_sampler = data.distributed.DistributedSampler(test_data, shuffle=False)
+        
         
         test_loader = data.DataLoader(test_data,
                                     batch_size=args.batch_size_val,
                                     shuffle=False,
                                     num_workers=args.workers_val,
                                     pin_memory=True,
-                                    sampler=test_sampler,
                                     drop_last=False)
         print(f"Loading {cur_dataset} done.")
     

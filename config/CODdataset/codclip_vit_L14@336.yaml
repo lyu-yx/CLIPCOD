@@ -1,6 +1,7 @@
 DATA:
   train_root: dataset/TrainDataset/
   test_root: dataset/TestDataset/
+  val_root: dataset/TestDataset/CAMO/
   dataset: CODtraindataset
   model_save_path: pretrain/
   save_map: True

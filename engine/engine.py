@@ -166,7 +166,7 @@ def test(test_loader, model, cur_dataset, args):
             res = model(image, desc)
 
             res = F.upsample(res, size=gt.shape[-2:], mode='bilinear', align_corners=False)
-            res = res.sigmoid().data.cpu().numpy()
+            res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             
             # save image
