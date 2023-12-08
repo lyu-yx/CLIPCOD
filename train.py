@@ -60,6 +60,11 @@ def main():
 
     args.ngpus_per_node = torch.cuda.device_count()
     args.world_size = args.ngpus_per_node * args.world_size
+
+    # global record
+    global best_score, best_epoch
+    best_score, best_epoch = 0, 0
+    
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
 
 
@@ -173,9 +178,6 @@ def main_worker(gpu, args):
     # start training
     start_time = time.time()
     
-    # global record
-    global best_score, best_epoch
-    best_score, best_epoch = 0, 0
     
     for epoch in range(args.start_epoch, args.epochs):
         epoch_log = epoch + 1
