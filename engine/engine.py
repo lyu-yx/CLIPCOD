@@ -88,11 +88,11 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                     step=epoch * len(train_loader) + (i + 1))
 
 
-def val(test_loader, model, epoch, args):
+def val(test_loader, model, epoch, args, best_score, best_epoch):
     """
     validation function
     """
-    global best_metric_dict, best_score, best_epoch
+    
     FM = Measure.Fmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()
@@ -122,10 +122,12 @@ def val(test_loader, model, epoch, args):
 
         if epoch == 1:
             best_score = cur_score
+            best_epoch = 1
             print('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
             logging.info('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
+            return best_score, best_epoch
         else:
             if cur_score > best_score:
                 best_metric_dict = metrics_dict
@@ -142,7 +144,7 @@ def val(test_loader, model, epoch, args):
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm'],
                 best_epoch, best_metric_dict['mxFm'], best_metric_dict['Sm'], best_metric_dict['mxEm']))
 
-
+            return best_score, best_epoch
 
 def test(test_loader, model, cur_dataset, args):
     """

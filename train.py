@@ -57,14 +57,10 @@ def main():
     args = get_parser()
     args.manual_seed = init_random_seed(args.manual_seed)
     set_random_seed(args.manual_seed, deterministic=False)
-
     args.ngpus_per_node = torch.cuda.device_count()
-    args.world_size = args.ngpus_per_node * args.world_size
-
-    # global record
+    args.world_size = args.ngpus_per_node * args.world_size 
     global best_score, best_epoch
     best_score, best_epoch = 0, 0
-    
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
 
 
@@ -191,7 +187,7 @@ def main_worker(gpu, args):
 
         # evaluation & save
         # if epoch > args.epochs//2:
-        val(val_loader, model, epoch, args)
+        best_score, best_epoch = val(val_loader, model, epoch, args, best_score, best_epoch)
 
         # update lr
         scheduler.step(epoch_log)
