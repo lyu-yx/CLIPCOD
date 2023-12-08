@@ -105,7 +105,9 @@ def val(test_loader, model, epoch, args, shared_vars):
     model.eval()
     with torch.no_grad():
         for i, (image, gt, desc, _) in enumerate(test_loader):
-            gt = np.asarray(gt, np.float32)
+            
+            gt = gt.numpy().astype(np.float32).squeeze()
+            gt /= (gt.max() + 1e-8)
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
             res = model(image, desc)
@@ -114,10 +116,10 @@ def val(test_loader, model, epoch, args, shared_vars):
             res = res.sigmoid().data.cpu().numpy()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 
-            WFM.step(pred=res, gt=gt)
-            SM.step(pred=res, gt=gt)
-            EM.step(pred=res, gt=gt)
-            MAE.step(pred=res, gt=gt)
+            WFM.step(pred=res*255, gt=gt*255)
+            SM.step(pred=res*255, gt=gt*255)
+            EM.step(pred=res*255, gt=gt*255)
+            MAE.step(pred=res*255, gt=gt*255)
             
         metrics_dict.update(sm=SM.get_results()['sm'].round(3))
         metrics_dict.update(em=EM.get_results()['em']['adp'].round(3))
