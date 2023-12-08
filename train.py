@@ -65,6 +65,7 @@ def main():
     shared_vars = manager.dict()
     shared_vars['best_score'] = 0
     shared_vars['best_epoch'] = 0
+    shared_vars['best_metric_dict'] = dict()
     mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, shared_vars))
 
 
@@ -191,7 +192,7 @@ def main_worker(gpu, args, shared_vars):
 
         # evaluation & save
         # if epoch > args.epochs//2:
-        val(val_loader, model, epoch, args, shared_vars)
+        val(val_loader, model, epoch_log, args, shared_vars)
 
         # update lr
         scheduler.step(epoch_log)
@@ -200,7 +201,7 @@ def main_worker(gpu, args, shared_vars):
         if args.clean_cache:
             torch.cuda.empty_cache()
 
-    time.sleep(2)
+    # time.sleep(2)
     if dist.get_rank() == 0:
         wandb.finish()
 

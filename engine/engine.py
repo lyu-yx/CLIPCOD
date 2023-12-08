@@ -30,7 +30,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
-    time.sleep(1)
+    # time.sleep(1)
     end = time.time()
 
     # size_list = [320, 352, 384, 416, 448, 480, 512]
@@ -93,9 +93,13 @@ def val(test_loader, model, epoch, args, shared_vars):
     validation function
     """
     
-    FM = Measure.Fmeasure()
+    # FM = Measure.Fmeasure()
+    # SM = Measure.Smeasure()
+    # EM = Measure.Emeasure()
+    WFM = Measure.WeightedFmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()
+    MAE = Measure.MAE()
     metrics_dict = dict()
 
     model.eval()
@@ -110,52 +114,51 @@ def val(test_loader, model, epoch, args, shared_vars):
             res = res.sigmoid().data.cpu().numpy()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 
-            FM.step(pred=res, gt=gt)
+            WFM.step(pred=res, gt=gt)
             SM.step(pred=res, gt=gt)
             EM.step(pred=res, gt=gt)
+            MAE.step(pred=res, gt=gt)
+            
+        metrics_dict.update(sm=SM.get_results()['sm'].round(3))
+        metrics_dict.update(em=EM.get_results()['em']['adp'].round(3))
+        metrics_dict.update(wfm=WFM.get_results()['wfm'].round(3))
+        metrics_dict.update(mae=MAE.get_results()['mae'].round(3))
 
-        metrics_dict.update(Sm=SM.get_results()['sm'])
-        metrics_dict.update(mxFm=FM.get_results()['fm']['curve'].max().round(3))
-        metrics_dict.update(mxEm=EM.get_results()['em']['curve'].max().round(3))
 
-        cur_score = metrics_dict['Sm'] + metrics_dict['mxFm'] + metrics_dict['mxEm']
+        cur_score = metrics_dict['sm'] + metrics_dict['em'] + metrics_dict['wfm']
 
         if epoch == 1:
             shared_vars['best_score'] = cur_score
             shared_vars['best_epoch'] = epoch
-            best_score = shared_vars['best_score']
-            best_epoch = shared_vars['best_epoch']
-            print('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
-                epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
-            logging.info('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
-                epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
+            shared_vars['best_metric_dict'] = metrics_dict.copy()
+            print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae']))
+            logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae']))
             
         else:
-            if cur_score > best_score:
+            if cur_score > shared_vars['best_score']:
                 shared_vars['best_score'] = cur_score
                 shared_vars['best_epoch'] = epoch
-                best_score = shared_vars['best_score']
-                best_epoch = shared_vars['best_epoch']
-                best_metric_dict = metrics_dict
+                shared_vars['best_metric_dict'] = metrics_dict.copy()
                 torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
                 print('>>> save state_dict successfully! best epoch is {}.'.format(epoch))
             else:
                 print('>>> not find the best epoch -> continue training ...')
-            print('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})\n[Best Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
-                epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm'],
-                best_epoch, best_metric_dict['mxFm'], best_metric_dict['Sm'], best_metric_dict['mxEm']))
-            logging.info('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})\n[Best Epoch:{}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
-                epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm'],
-                best_epoch, best_metric_dict['mxFm'], best_metric_dict['Sm'], best_metric_dict['mxEm']))
-
-            
+            print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['wfm'], 
+                shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
+            logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['wfm'], 
+                shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
 
 def test(test_loader, model, cur_dataset, args):
     """
     validation function
     """
-    global best_metric_dict, best_score, best_epoch
-    
+
     WFM = Measure.WeightedFmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()
