@@ -88,7 +88,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                     step=epoch * len(train_loader) + (i + 1))
 
 
-def val(test_loader, model, epoch, args, best_score, best_epoch):
+def val(test_loader, model, epoch, args, shared_vars):
     """
     validation function
     """
@@ -121,18 +121,22 @@ def val(test_loader, model, epoch, args, best_score, best_epoch):
         cur_score = metrics_dict['Sm'] + metrics_dict['mxFm'] + metrics_dict['mxEm']
 
         if epoch == 1:
-            best_score = cur_score
-            best_epoch = 1
+            shared_vars['best_score'] = cur_score
+            shared_vars['best_epoch'] = epoch
+            best_score = shared_vars['best_score']
+            best_epoch = shared_vars['best_epoch']
             print('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
             logging.info('[Cur Epoch: {}] Metrics (mxFm={}, Sm={}, mxEm={})'.format(
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm']))
-            return best_score, best_epoch
+            
         else:
             if cur_score > best_score:
+                shared_vars['best_score'] = cur_score
+                shared_vars['best_epoch'] = epoch
+                best_score = shared_vars['best_score']
+                best_epoch = shared_vars['best_epoch']
                 best_metric_dict = metrics_dict
-                best_score = cur_score
-                best_epoch = epoch
                 torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
                 print('>>> save state_dict successfully! best epoch is {}.'.format(epoch))
             else:
@@ -144,7 +148,7 @@ def val(test_loader, model, epoch, args, best_score, best_epoch):
                 epoch, metrics_dict['mxFm'], metrics_dict['Sm'], metrics_dict['mxEm'],
                 best_epoch, best_metric_dict['mxFm'], best_metric_dict['Sm'], best_metric_dict['mxEm']))
 
-            return best_score, best_epoch
+            
 
 def test(test_loader, model, cur_dataset, args):
     """

@@ -59,12 +59,16 @@ def main():
     set_random_seed(args.manual_seed, deterministic=False)
     args.ngpus_per_node = torch.cuda.device_count()
     args.world_size = args.ngpus_per_node * args.world_size 
-    global best_score, best_epoch
-    best_score, best_epoch = 0, 0
-    mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, ))
+    
+    # make shared dictionary among mp 
+    manager = mp.Manager()
+    shared_vars = manager.dict()
+    shared_vars['best_score'] = 0
+    shared_vars['best_epoch'] = 0
+    mp.spawn(main_worker, nprocs=args.ngpus_per_node, args=(args, shared_vars))
 
 
-def main_worker(gpu, args):
+def main_worker(gpu, args, shared_vars):
     args.output_dir = os.path.join(args.map_save_path, args.exp_name)
 
     # local rank & global rank
@@ -187,7 +191,7 @@ def main_worker(gpu, args):
 
         # evaluation & save
         # if epoch > args.epochs//2:
-        best_score, best_epoch = val(val_loader, model, epoch, args, best_score, best_epoch)
+        val(val_loader, model, epoch, args, shared_vars)
 
         # update lr
         scheduler.step(epoch_log)
