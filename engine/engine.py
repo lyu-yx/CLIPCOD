@@ -130,7 +130,7 @@ def val(test_loader, model, epoch, args, shared_vars):
         metrics_dict.update(mae=MAE.get_results()['mae'].round(3))
 
 
-        cur_score = metrics_dict['sm'] + metrics_dict['em'] + metrics_dict['wfm']
+        cur_score = metrics_dict['sm'] + metrics_dict['em'] + metrics_dict['wfm'] - 0.5 * metrics_dict['mae']
 
         if epoch == 1:
             shared_vars['best_score'] = cur_score
