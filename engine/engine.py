@@ -106,15 +106,18 @@ def val(test_loader, model, epoch, args, shared_vars):
     with torch.no_grad():
         for i, (image, gt, desc, _) in enumerate(test_loader):
             
-            gt = gt.numpy().astype(np.float32).squeeze()
-            gt /= (gt.max() + 1e-8)
+            
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
             res = model(image, desc)
 
-            res = F.upsample(res, size=gt.shape[-2:], mode='bilinear', align_corners=False)
-            res = res.sigmoid().data.cpu().numpy()
+            gt = gt.numpy().astype(np.float32).squeeze()
+            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
+
+            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
+            res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+            
 
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)

@@ -120,7 +120,7 @@ def main_worker(gpu, args, shared_vars):
 
     
     # build dataset
-    print('load data...')
+    print('building dataset...')
     train_data = CamObjDataset(image_root=args.train_root + 'Imgs/',
                               gt_root=args.train_root + 'GT/',
                               fix_root=args.train_root + 'Fix/',
@@ -132,8 +132,10 @@ def main_worker(gpu, args, shared_vars):
                               desc_root=args.val_root + 'Desc/',
                               testsize=args.input_size,
                               word_length=args.word_len)
-    total_step = len(train_data)
+    # total_step = len(train_data)
+
     # build dataloader
+    print('building dataloader...')
     init_fn = partial(worker_init_fn,
                       num_workers=args.workers,
                       rank=args.rank,

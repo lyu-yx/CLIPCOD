@@ -9,16 +9,16 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from .simple_tokenizer import SimpleTokenizer as _Tokenizer
 
-def cv_random_flip(img, label, grad):
+def cv_random_flip(img, label, fix):
     flip_flag = random.randint(0, 1)
     if flip_flag == 1:
         img = img.transpose(Image.FLIP_LEFT_RIGHT)
         label = label.transpose(Image.FLIP_LEFT_RIGHT)
-        grad = grad.transpose(Image.FLIP_LEFT_RIGHT)
-    return img, label, grad
+        fix = fix.transpose(Image.FLIP_LEFT_RIGHT)
+    return img, label, fix
 
 
-def randomCrop(image, label, grad):
+def randomCrop(image, label, fix):
     border = 30
     image_width = image.size[0]
     image_height = image.size[1]
@@ -27,17 +27,17 @@ def randomCrop(image, label, grad):
     random_region = (
         (image_width - crop_win_width) >> 1, (image_height - crop_win_height) >> 1, (image_width + crop_win_width) >> 1,
         (image_height + crop_win_height) >> 1)
-    return image.crop(random_region), label.crop(random_region), grad.crop(random_region)
+    return image.crop(random_region), label.crop(random_region), fix.crop(random_region)
 
 
-def randomRotation(image, label, grad):
+def randomRotation(image, label, fix):
     mode = Image.BICUBIC
     if random.random() > 0.8:
         random_angle = np.random.randint(-15, 15)
         image = image.rotate(random_angle, mode)
         label = label.rotate(random_angle, mode)
-        grad = grad.rotate(random_angle, mode)
-    return image, label, grad
+        fix = fix.rotate(random_angle, mode)
+    return image, label, fix
 
 
 def colorEnhance(image):
