@@ -21,56 +21,56 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     batch_time = AverageMeter('Batch', ':2.2f')
     data_time = AverageMeter('Data', ':2.2f')
     lr = AverageMeter('Lr', ':1.6f')
-    loss_meter = AverageMeter('Loss', ':2.4f')
-    # iou_meter = AverageMeter('IoU', ':2.2f')
-    # pr_meter = AverageMeter('Prec@50', ':2.2f')
+    total_loss_meter = AverageMeter('Loss', ':2.4f')
+    fix_loss_meter = AverageMeter('Fix Loss', ':2.4f')
+    kl_loss_meter = AverageMeter('KL Loss', ':2.4f')
+    cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, lr, loss_meter,],
+        [batch_time, data_time, lr, total_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
-    # time.sleep(1)
     end = time.time()
 
-    # size_list = [320, 352, 384, 416, 448, 480, 512]
-    # idx = np.random.choice(len(size_list))
-    # new_size = size_list[idx]
-
-    for i, (image, target, fix, text) in enumerate(train_loader):
+    for i, (image, target, fix, desc) in enumerate(train_loader):
         data_time.update(time.time() - end)
         # data
         image = image.cuda(non_blocking=True)
         target = target.cuda(non_blocking=True)
-        text = text.cuda(non_blocking=True)
+        desc = desc.cuda(non_blocking=True)
         fix = fix.cuda(non_blocking=True)
-        # # multi-scale training
-        # image = F.interpolate(image, size=(new_size, new_size), mode='bilinear')
 
         # forward
         with amp.autocast():
-            pred, target, loss = model(image, text, target)
+            pred, target, total_loss, fix_loss, kl_loss, cc_loss = model(image, desc, target)
 
         # backward
         optimizer.zero_grad()
-        scaler.scale(loss).backward()
+        scaler.scale(total_loss).backward()
         if args.max_norm:
             torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_norm)
         scaler.step(optimizer)
         scaler.update()
 
         # metric
-        # iou, pr5 = trainMetricGPU(pred, target, 0.35, 0.5)
-        dist.all_reduce(loss.detach())
-        # dist.all_reduce(iou)
-        # dist.all_reduce(pr5)
-        loss = loss / dist.get_world_size()
-        # iou = iou / dist.get_world_size()
-        # pr5 = pr5 / dist.get_world_size()
+        dist.all_reduce(total_loss.detach())
+        total_loss = total_loss / dist.get_world_size()
+        total_loss_meter.update(total_loss.item(), image.size(0))
 
-        loss_meter.update(loss.item(), image.size(0))
-        # iou_meter.update(iou.item(), image.size(0))
-        # pr_meter.update(pr5.item(), image.size(0))
+        dist.all_reduce(fix_loss.detach())
+        fix_loss = fix_loss / dist.get_world_size()
+        fix_loss.update(fix_loss.item(), image.size(0))
+
+        dist.all_reduce(kl_loss.detach())
+        kl_loss = total_loss / dist.get_world_size()
+        kl_loss.update(kl_loss.item(), image.size(0))
+
+        dist.all_reduce(cc_loss.detach())
+        cc_loss = cc_loss / dist.get_world_size()
+        cc_loss.update(cc_loss.item(), image.size(0))
+
+
         lr.update(scheduler.get_last_lr()[-1])
         batch_time.update(time.time() - end)
         end = time.time()
@@ -83,7 +83,11 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "time/batch": batch_time.val,
                         "time/data": data_time.val,
                         "training/lr": lr.val,
-                        "training/loss": loss_meter.val,
+                        "training/total loss": total_loss_meter.val,
+                        "training/fix loss": fix_loss_meter.val,
+                        "training/kl loss": kl_loss_meter.val,
+                        "training/cc loss": cc_loss_meter.val,
+
                     },
                     step=epoch * len(train_loader) + (i + 1))
 
@@ -93,9 +97,6 @@ def val(test_loader, model, epoch, args, shared_vars):
     validation function
     """
     
-    # FM = Measure.Fmeasure()
-    # SM = Measure.Smeasure()
-    # EM = Measure.Emeasure()
     WFM = Measure.WeightedFmeasure()
     SM = Measure.Smeasure()
     EM = Measure.Emeasure()

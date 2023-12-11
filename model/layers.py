@@ -44,6 +44,40 @@ class CoordConv(nn.Module):
         return x
 
 
+class DimensionalReduction(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(DimensionalReduction, self).__init__()
+        self.reduce = nn.Sequential(
+            conv_layer(in_channel, out_channel, 3, padding=1),
+            conv_layer(out_channel, out_channel, 3, padding=1)
+        )
+
+    def forward(self, x):
+        return self.reduce(x)
+
+
+class FixationEstimation(nn.Module):
+    def __init__(self,):
+        super(FixationEstimation, self).__init__()
+        self.reduce0 = DimensionalReduction(1024, 256) #  x0 -> x2 shallower to deeper
+        self.reduce1 = DimensionalReduction(1024, 256) #  1024/768 worddim
+        self.reduce2 = DimensionalReduction(1024, 256)
+        self.shallow_fusion = nn.Sequential(conv_layer(256 + 256, 256, 3, padding=1))
+        self.deep_fusion = nn.Sequential(
+            conv_layer(256 + 256, 256, 3, padding=1),
+            nn.Conv2d(256, 1, 1))
+    
+    def forward(self, x):
+        # size = x[0].size()[2:] 
+        x0 = self.reduce0(x[0])
+        x1 = self.reduce1(x[1])
+        x2 = self.reduce2(x[2])
+
+        out = self.shallow_fusion(torch.cat((x0, x1), dim=1))
+        out = self.deep_fusion(torch.cat((out, x2), dim=1))
+        return out
+
+
 class Projector(nn.Module):
     def __init__(self, word_dim=1024, in_dim=256, kernel_size=3):
         super().__init__()

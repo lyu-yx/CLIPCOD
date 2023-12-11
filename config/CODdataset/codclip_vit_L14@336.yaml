@@ -14,11 +14,11 @@ TRAIN:
   clip_pretrain: pretrain/ViT-L-14-336px.pt
   input_size: 336
   word_len: 77
-  word_dim: 768
+  word_dim: 1024
   feats_layer_num: [7, 15, 23]
-  vis_dim: 768
-  fpn_in: [768, 768, 768]  # defined by Vit
-  fpn_out: [384, 768, 1024]
+  vis_dim: 512
+  fpn_in: [512, 1024, 1024]  # defined by Vit
+  fpn_out: [256, 512, 1024]
   sync_bn: True
   # Decoder
   num_layers: 3
@@ -29,8 +29,8 @@ TRAIN:
   # Training Setting
   workers: 16  # data loader workers
   workers_val: 8
-  epochs: 100
-  milestones: [35, 75]
+  epochs: 200
+  milestones: [100, 150]
   start_epoch: 0
   batch_size: 12  # batch size for training
   batch_size_val: 1  # batch size for validation during training, use 1 for metric compatibale consideration
@@ -41,6 +41,7 @@ TRAIN:
   max_norm: 0.
   manual_seed: 0
   print_freq: 100
+  fixation_weight: 0.5
   # Resume & Save
   weight:  # path to initial weight (default: none)
   resume:  # path to latest checkpoint (default: none)
