@@ -33,17 +33,17 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     model.train()
     end = time.time()
 
-    for i, (image, target, fix, desc) in enumerate(train_loader):
+    for i, (img, img_gt, fix_gt, desc) in enumerate(train_loader):
         data_time.update(time.time() - end)
         # data
-        image = image.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True)
+        img = img.cuda(non_blocking=True)
+        img_gt = img_gt.cuda(non_blocking=True)
         desc = desc.cuda(non_blocking=True)
-        fix = fix.cuda(non_blocking=True)
+        fix_gt = fix_gt.cuda(non_blocking=True)
 
         # forward
         with amp.autocast():
-            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss = model(image, desc, target)
+            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss = model(img, desc, img_gt, fix_gt)
 
         # backward
         optimizer.zero_grad()
@@ -56,19 +56,19 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         # metric
         dist.all_reduce(total_loss.detach())
         total_loss = total_loss / dist.get_world_size()
-        total_loss_meter.update(total_loss.item(), image.size(0))
+        total_loss_meter.update(total_loss.item(), img.size(0))
 
         dist.all_reduce(fix_loss.detach())
         fix_loss = fix_loss / dist.get_world_size()
-        fix_loss_meter.update(fix_loss.item(), image.size(0))
+        fix_loss_meter.update(fix_loss.item(), img.size(0))
 
         dist.all_reduce(kl_loss.detach())
         kl_loss = total_loss / dist.get_world_size()
-        kl_loss_meter.update(kl_loss.item(), image.size(0))
+        kl_loss_meter.update(kl_loss.item(), img.size(0))
 
         dist.all_reduce(cc_loss.detach())
         cc_loss = cc_loss / dist.get_world_size()
-        cc_loss_meter.update(cc_loss.item(), image.size(0))
+        cc_loss_meter.update(cc_loss.item(), img.size(0))
 
 
         lr.update(scheduler.get_last_lr()[-1])

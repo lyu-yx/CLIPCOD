@@ -3,10 +3,10 @@ DATA:
   test_root: dataset/TestDataset/
   val_root: dataset/TestDataset/CAMO/
   dataset: CODtraindataset
-  model_save_path: pretrain/
+  model_save_path: pretrain/desc_vision_fix
   save_map: True
   map_save_path: exp/
-  exp_name: blank_with_nofix
+  exp_name: desc_vision_fix
   test_dataset: ['CHAMELEON', 'CAMO', 'COD10K', 'NC4K']
 
 TRAIN:

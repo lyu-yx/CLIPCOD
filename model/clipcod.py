@@ -83,7 +83,7 @@ class CLIPCOD(nn.Module):
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
         self.fixation_weight = cfg.fixation_weight
 
-    def forward(self, img, word, gt=None):
+    def forward(self, img, word, img_gt, fix_gt):
         '''
             img: b, 3, h, w
             word: b, words
@@ -112,14 +112,14 @@ class CLIPCOD(nn.Module):
 
         if self.training:
             # resize mask
-            if pred.shape[-2:] != gt.shape[-2:]:
-                gt = F.interpolate(gt, pred.shape[-2:],
+            if pred.shape[-2:] != img_gt.shape[-2:]:
+                img_gt = F.interpolate(img_gt, pred.shape[-2:],
                                      mode='nearest').detach()
-            mask_loss = structure_loss(pred, gt)
-            kl_loss = kl_div_loss(pred, gt)
-            cc_loss = correlation_coefficient_loss(pred, gt)
+            mask_loss = structure_loss(pred, img_gt)
+            kl_loss = kl_div_loss(fix_out, fix_gt)
+            cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
             fix_loss = kl_loss + cc_loss
-            total_loss = fix_loss * self.fixation_weight + mask_loss + fix_loss
+            total_loss = fix_loss * self.fixation_weight + mask_loss 
             return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss
         else:
             return pred.detach()
