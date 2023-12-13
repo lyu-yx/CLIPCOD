@@ -60,15 +60,15 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         dist.all_reduce(fix_loss.detach())
         fix_loss = fix_loss / dist.get_world_size()
-        fix_loss.update(fix_loss.item(), image.size(0))
+        fix_loss_meter.update(fix_loss.item(), image.size(0))
 
         dist.all_reduce(kl_loss.detach())
         kl_loss = total_loss / dist.get_world_size()
-        kl_loss.update(kl_loss.item(), image.size(0))
+        kl_loss_meter.update(kl_loss.item(), image.size(0))
 
         dist.all_reduce(cc_loss.detach())
         cc_loss = cc_loss / dist.get_world_size()
-        cc_loss.update(cc_loss.item(), image.size(0))
+        cc_loss_meter.update(cc_loss.item(), image.size(0))
 
 
         lr.update(scheduler.get_last_lr()[-1])

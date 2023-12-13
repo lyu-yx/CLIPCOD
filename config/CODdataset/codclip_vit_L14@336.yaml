@@ -14,13 +14,13 @@ TRAIN:
   clip_pretrain: pretrain/ViT-L-14-336px.pt
   input_size: 336
   word_len: 77
-  word_dim: 512 # align with fpn_out[1]
+  word_dim: 768 # align with fpn_out[1]
   feats_layer_num: [7, 15, 23]
   fpn_in: [768, 768, 768]  # defined by Vit
-  fpn_out: [256, 512, 1024]
+  fpn_out: [256, 768, 1024]
   sync_bn: True
   # Decoder
-  vis_dim: 768
+  vis_dim: 768 # consist with CLIP out
   num_layers: 3
   num_head: 8
   dim_ffn: 2048
