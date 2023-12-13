@@ -28,7 +28,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     mask_loss_meter = AverageMeter('mask Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, lr, total_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
+        [batch_time, data_time, lr, total_loss_meter, mask_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
