@@ -31,6 +31,7 @@ def kl_div_loss(fix_pred, gt):
     
     assert expand_s_map.size() == fix_pred.size()
 
+
     sum_gt = torch.sum(gt.view(batch_size, -1), 1)
     expand_gt = sum_gt.view(batch_size, 1, 1).expand(batch_size, w, h)
     

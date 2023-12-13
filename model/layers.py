@@ -64,10 +64,11 @@ class FixationEstimation(nn.Module):
         self.reduce2 = DimensionalReduction(in_channels[2], 256)
         self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
+            nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(256, 128, 3, padding=1),
             nn.Conv2d(128, 1, 1))
-    
     def forward(self, x):
         # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
         x0 = d3_to_d4(self, x[0])

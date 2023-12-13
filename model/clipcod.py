@@ -65,13 +65,19 @@ class CLIPCODBLANK(nn.Module):
 class CLIPCOD(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        # para init
+        self.fixation_weight = cfg.fixation_weight
+        
         # Vision & Text Encoder
-        clip_model = torch.jit.load(cfg.clip_pretrain,
-                                    map_location="cpu").eval()
+        clip_model = torch.jit.load(cfg.clip_pretrain, map_location="cpu").eval()
         self.backbone = build_model(clip_model.state_dict(), cfg.word_len, cfg.feats_layer_num).float()
+        
         # Multi-Modal FPN
-        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
+        
+        # fixation prediction
+        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
+        
         # Decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,
                                           d_model=cfg.vis_dim,
@@ -81,8 +87,7 @@ class CLIPCOD(nn.Module):
                                           return_intermediate=cfg.intermediate)
         # Projector
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
-        self.fixation_weight = cfg.fixation_weight
-
+        
     def forward(self, img, word, img_gt, fix_gt):
         '''
             img: b, 3, h, w
@@ -113,8 +118,8 @@ class CLIPCOD(nn.Module):
         if self.training:
             # resize mask
             if pred.shape[-2:] != img_gt.shape[-2:]:
-                img_gt = F.interpolate(img_gt, pred.shape[-2:],
-                                     mode='nearest').detach()
+                img_gt = F.interpolate(img_gt, pred.shape[-2:], mode='nearest').detach()
+                fix_gt = F.interpolate(fix_gt, pred.shape[-2:], mode='nearest').detach()
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
