@@ -120,11 +120,12 @@ class CLIPCOD(nn.Module):
             if pred.shape[-2:] != img_gt.shape[-2:]:
                 img_gt = F.interpolate(img_gt, pred.shape[-2:], mode='nearest').detach()
                 fix_gt = F.interpolate(fix_gt, pred.shape[-2:], mode='nearest').detach()
+           
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
             fix_loss = kl_loss + cc_loss
             total_loss = fix_loss * self.fixation_weight + mask_loss 
-            return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss
+            return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss
         else:
             return pred.detach()

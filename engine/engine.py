@@ -25,6 +25,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     fix_loss_meter = AverageMeter('Fix Loss', ':2.4f')
     kl_loss_meter = AverageMeter('KL Loss', ':2.4f')
     cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
+    mask_loss_meter = AverageMeter('mask Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
         [batch_time, data_time, lr, total_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
@@ -43,7 +44,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         # forward
         with amp.autocast():
-            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss = model(img, desc, img_gt, fix_gt)
+            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss = model(img, desc, img_gt, fix_gt)
 
         # backward
         optimizer.zero_grad()
@@ -70,6 +71,10 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         cc_loss = cc_loss / dist.get_world_size()
         cc_loss_meter.update(cc_loss.item(), img.size(0))
 
+        dist.all_reduce(mask_loss.detach())
+        mask_loss = mask_loss / dist.get_world_size()
+        mask_loss_meter.update(mask_loss.item(), img.size(0))
+
 
         lr.update(scheduler.get_last_lr()[-1])
         batch_time.update(time.time() - end)
@@ -87,6 +92,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "training/fix loss": fix_loss_meter.val,
                         "training/kl loss": kl_loss_meter.val,
                         "training/cc loss": cc_loss_meter.val,
+                        "training/mask loss": mask_loss_meter.val,
 
                     },
                     step=epoch * len(train_loader) + (i + 1))
