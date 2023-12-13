@@ -65,19 +65,22 @@ class FixationEstimation(nn.Module):
         self.shallow_fusion = nn.Sequential(conv_layer(768 + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
             conv_layer(768 + 256, 256, 3, padding=1),
-            nn.Conv2d(256, 1, 1))
+            conv_layer(256, 128, 3, padding=1),
+            nn.Conv2d(128, 1, 1))
     
     def forward(self, x):
-        # size = x[0].size()[2:]  # x: 3*[b, 576, 768]
-        x0 = self.reduce0(x[0])   # [b, 768, 24, 24]
-        x0 = d3_to_d4(x0)
-        x1 = self.reduce1(x[1])
-        x1 = d3_to_d4(x1)
-        x2 = self.reduce2(x[2])
-        x2 = d3_to_d4(x2)
-
-        out = self.shallow_fusion(torch.cat((x0, x1), dim=1))
-        out = self.deep_fusion(torch.cat((out, x2), dim=1))
+        # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
+        x0 = d3_to_d4(self, x[0])
+        x0 = self.reduce0(x0)      # [b, 768, 24, 24] -> [b, 256, 24, 24]
+        x1 = d3_to_d4(self, x[1])  # [b, 768, 24, 24]
+        out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+        # x1 = self.reduce1(x1)
+        x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
+        out = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+        
+        # x2 = self.reduce2(x2)
+        # out = self.shallow_fusion(torch.cat((x0, x1), dim=1))
+        # out = self.deep_fusion(torch.cat((out, x2), dim=1))
         return out
 
 

@@ -1,4 +1,4 @@
-from .segmenter import CLIPCOD
+from .clipcod import CLIPCOD
 from loguru import logger
 
 # def build_segmenter(args):
