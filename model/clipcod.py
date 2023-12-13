@@ -70,7 +70,7 @@ class CLIPCOD(nn.Module):
                                     map_location="cpu").eval()
         self.backbone = build_model(clip_model.state_dict(), cfg.word_len, cfg.feats_layer_num).float()
         # Multi-Modal FPN
-        self.fix_encoder = FixationEstimation()
+        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
         # Decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,

@@ -57,14 +57,14 @@ class DimensionalReduction(nn.Module):
 
 
 class FixationEstimation(nn.Module):
-    def __init__(self,):
+    def __init__(self, in_channels):
         super(FixationEstimation, self).__init__()
-        self.reduce0 = DimensionalReduction(768, 256) #  x0 -> x2 shallower to deeper
-        self.reduce1 = DimensionalReduction(768, 256) #  1024/768 worddim
-        self.reduce2 = DimensionalReduction(768, 256)
-        self.shallow_fusion = nn.Sequential(conv_layer(768 + 256, 256, 3, padding=1))
+        self.reduce0 = DimensionalReduction(in_channels[0], 256) #  x0 -> x2 shallower to deeper
+        self.reduce1 = DimensionalReduction(in_channels[1], 256) #  1024/768 worddim
+        self.reduce2 = DimensionalReduction(in_channels[2], 256)
+        self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
-            conv_layer(768 + 256, 256, 3, padding=1),
+            conv_layer(in_channels[1] + 256, 256, 3, padding=1),
             conv_layer(256, 128, 3, padding=1),
             nn.Conv2d(128, 1, 1))
     
@@ -304,7 +304,6 @@ class FPN(nn.Module):
         super(FPN, self).__init__()
         # text projection [b, 768] --> [b, 1024]
         self.txt_proj = linear_layer(in_channels[2], out_channels[2]) # linear + batch norm + relu
-
 
         # fusion 1: v5 & seq -> f_5: b, 1024, 24, 24
         self.f1_v_proj = conv_layer(in_channels[2], out_channels[2], 1, 0)  # CBR
