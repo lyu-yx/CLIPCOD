@@ -22,12 +22,12 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     data_time = AverageMeter('Data', ':2.2f')
     lr = AverageMeter('Lr', ':1.6f')
     total_loss_meter = AverageMeter('Loss', ':2.4f')
-    fix_loss_meter = AverageMeter('Fix Loss', ':2.4f')
-    kl_loss_meter = AverageMeter('KL Loss', ':2.4f')
-    cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
+    # fix_loss_meter = AverageMeter('Fix Loss', ':2.4f')
+    # kl_loss_meter = AverageMeter('KL Loss', ':2.4f')
+    # cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, lr, total_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
+        [batch_time, data_time, lr, total_loss_meter],
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
@@ -58,17 +58,17 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         total_loss = total_loss / dist.get_world_size()
         total_loss_meter.update(total_loss.item(), image.size(0))
 
-        dist.all_reduce(fix_loss.detach())
-        fix_loss = fix_loss / dist.get_world_size()
-        fix_loss_meter.update(fix_loss.item(), image.size(0))
+        # dist.all_reduce(fix_loss.detach())
+        # fix_loss = fix_loss / dist.get_world_size()
+        # fix_loss_meter.update(fix_loss.item(), image.size(0))
 
-        dist.all_reduce(kl_loss.detach())
-        kl_loss = total_loss / dist.get_world_size()
-        kl_loss_meter.update(kl_loss.item(), image.size(0))
+        # dist.all_reduce(kl_loss.detach())
+        # kl_loss = total_loss / dist.get_world_size()
+        # kl_loss_meter.update(kl_loss.item(), image.size(0))
 
-        dist.all_reduce(cc_loss.detach())
-        cc_loss = cc_loss / dist.get_world_size()
-        cc_loss_meter.update(cc_loss.item(), image.size(0))
+        # dist.all_reduce(cc_loss.detach())
+        # cc_loss = cc_loss / dist.get_world_size()
+        # cc_loss_meter.update(cc_loss.item(), image.size(0))
 
 
         lr.update(scheduler.get_last_lr()[-1])
@@ -83,11 +83,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "time/batch": batch_time.val,
                         "time/data": data_time.val,
                         "training/lr": lr.val,
-                        "training/total loss": total_loss_meter.val,
-                        "training/fix loss": fix_loss_meter.val,
-                        "training/kl loss": kl_loss_meter.val,
-                        "training/cc loss": cc_loss_meter.val,
-
+                        "training/total loss": total_loss_meter.val
                     },
                     step=epoch * len(train_loader) + (i + 1))
 
