@@ -119,7 +119,7 @@ class CLIPCOD(nn.Module):
             kl_loss = kl_div_loss(pred, gt)
             cc_loss = correlation_coefficient_loss(pred, gt)
             fix_loss = kl_loss + cc_loss
-            total_loss = fix_loss * self.fixation_weight + mask_loss
+            total_loss = fix_loss * self.fixation_weight + mask_loss + fix_loss
             return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss
         else:
             return pred.detach()

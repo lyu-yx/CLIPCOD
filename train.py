@@ -94,7 +94,7 @@ def main_worker(gpu, args, shared_vars):
         wandb.init(job_type="training",
                    mode="online",
                    config=args,
-                   project="CLIPCOD-model-with-desc$vision",
+                   project="CLIPCOD-model-with-desc$vision&fix",
                    name=args.exp_name,
                    tags=[args.dataset, args.clip_pretrain])
     dist.barrier(device_ids=[args.gpu])
