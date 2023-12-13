@@ -100,7 +100,7 @@ class CLIPCOD(nn.Module):
         word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
 
         # b, c, 24, 24
-        fix = self.fix_encoder(vis)
+        fix = self.fix_encoder(vis)  # [b, 1, 24, 24]
 
         fq = self.neck(vis, state)
         b, c, h, w = fq.size()

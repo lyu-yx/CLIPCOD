@@ -298,7 +298,7 @@ def d3_to_d4(self, t):
 
 class FPN(nn.Module):
     def __init__(self,
-                 in_channels=[512, 1024, 1024],
+                 in_channels=[768, 768, 768],
                  out_channels=[256, 512, 1024]):
         super(FPN, self).__init__()
         # text projection [b, 768] --> [b, 1024]
@@ -334,7 +334,7 @@ class FPN(nn.Module):
         v4 = d3_to_d4(self, v4)
         v5 = d3_to_d4(self, v5) 
         # fusion 1: b, 768, 24, 24
-        # text projection: b, 1024 -> b, 1024
+        # text projection: b, 768 -> b, 1024
         # out: b, 1024, 24, 24
         state = self.txt_proj(state).unsqueeze(-1).unsqueeze(-1)  # b, 1024, 1, 1
         f5 = self.f1_v_proj(v5)
