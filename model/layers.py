@@ -356,5 +356,5 @@ class FPN(nn.Module):
         fq = torch.cat([fq3, fq4, fq5], dim=1)
         fq = self.aggr(fq)
         fq = self.coordconv(fq)
-        # b, 768, 24, 24
+        # b, out_channels[1], 24, 24
         return fq

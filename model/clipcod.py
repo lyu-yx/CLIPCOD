@@ -102,12 +102,12 @@ class CLIPCOD(nn.Module):
         # b, c, 24, 24
         fix = self.fix_encoder(vis)  # [b, 1, 24, 24]
 
-        fq = self.neck(vis, state)
-        b, c, h, w = fq.size()
-        fq = self.decoder(fq, word, pad_mask)
-        fq = fq.reshape(b, c, h, w)  # [b, c, 24, 24]
+        multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
+        b, c, h, w = multimodal_feats.size()
+        multimodal_feats = self.decoder(multimodal_feats, word, pad_mask)
+        multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
-        pred = self.proj(fq, state) # [b, c, 96, 96]
+        pred = self.proj(multimodal_feats, state) # [b, c, 96, 96]
 
         if self.training:
             # resize mask
