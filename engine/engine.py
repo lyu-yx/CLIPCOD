@@ -43,7 +43,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         # forward
         with amp.autocast():
-            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss = model(image, desc, target)
+            pred, total_loss= model(image, desc, target)
 
         # backward
         optimizer.zero_grad()

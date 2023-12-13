@@ -100,7 +100,7 @@ class CLIPCOD(nn.Module):
         word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
 
         # b, c, 24, 24
-        fix_out = self.fix_encoder(vis)  # [b, 1, 24, 24]
+        # fix_out = self.fix_encoder(vis)  # [b, 1, 24, 24]
 
         multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
         b, c, h, w = multimodal_feats.size()
@@ -116,10 +116,10 @@ class CLIPCOD(nn.Module):
                 gt = F.interpolate(gt, pred.shape[-2:],
                                      mode='nearest').detach()
             mask_loss = structure_loss(pred, gt)
-            kl_loss = kl_div_loss(pred, gt)
-            cc_loss = correlation_coefficient_loss(pred, gt)
-            fix_loss = kl_loss + cc_loss
-            total_loss = fix_loss * self.fixation_weight + mask_loss
-            return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss
+            # kl_loss = kl_div_loss(pred, gt)
+            # cc_loss = correlation_coefficient_loss(pred, gt)
+            # fix_loss = kl_loss + cc_loss
+            total_loss =  mask_loss
+            return pred.detach(), total_loss
         else:
             return pred.detach()
