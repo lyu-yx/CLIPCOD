@@ -3,7 +3,7 @@ DATA:
   test_root: dataset/TestDataset/
   val_root: dataset/TestDataset/CAMO/
   dataset: CODtraindataset
-  model_save_path: pretrain/desc_vision_fix
+  model_save_path: pretrain/desc_vision_fix/
   save_map: True
   map_save_path: exp/
   exp_name: desc_vision_fix
