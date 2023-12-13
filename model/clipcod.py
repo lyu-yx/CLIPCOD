@@ -83,7 +83,7 @@ class CLIPCOD(nn.Module):
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
         self.fixation_weight = cfg.fixation_weight
 
-    def forward(self, img, word, mask=None):
+    def forward(self, img, word, gt=None):
         '''
             img: b, 3, h, w
             word: b, words
@@ -100,25 +100,26 @@ class CLIPCOD(nn.Module):
         word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
 
         # b, c, 24, 24
-        fix = self.fix_encoder(vis)  # [b, 1, 24, 24]
+        fix_out = self.fix_encoder(vis)  # [b, 1, 24, 24]
 
         multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
         b, c, h, w = multimodal_feats.size()
         multimodal_feats = self.decoder(multimodal_feats, word, pad_mask)
         multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
+        
         pred = self.proj(multimodal_feats, state) # [b, c, 96, 96]
 
         if self.training:
             # resize mask
-            if pred.shape[-2:] != mask.shape[-2:]:
-                mask = F.interpolate(mask, pred.shape[-2:],
+            if pred.shape[-2:] != gt.shape[-2:]:
+                gt = F.interpolate(gt, pred.shape[-2:],
                                      mode='nearest').detach()
-            mask_loss = structure_loss(pred, mask)
-            kl_loss = kl_div_loss(pred, mask)
-            cc_loss = correlation_coefficient_loss(pred, mask)
+            mask_loss = structure_loss(pred, gt)
+            kl_loss = kl_div_loss(pred, gt)
+            cc_loss = correlation_coefficient_loss(pred, gt)
             fix_loss = kl_loss + cc_loss
             total_loss = fix_loss * self.fixation_weight + mask_loss
-            return pred.detach(), mask, total_loss, fix_loss, kl_loss, cc_loss
+            return pred.detach(), gt, fix_out, total_loss, fix_loss, kl_loss, cc_loss
         else:
             return pred.detach()

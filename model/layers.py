@@ -90,19 +90,20 @@ class Projector(nn.Module):
         self.in_dim = in_dim
         self.kernel_size = kernel_size
         # visual projector
-        self.vis = nn.Sequential(  # os16 -> os4
+        self.vis = nn.Sequential(  # spatical resolution times 4
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_dim , in_dim * 2, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_dim * 2, in_dim, 3, padding=1),
             nn.Conv2d(in_dim, in_dim, 1))
         # textual projector
+        self.c_adj = conv_layer(768, word_dim, 3, padding=1)
         out_dim = 1 * in_dim * kernel_size * kernel_size + 1
         self.txt = nn.Linear(word_dim, out_dim)
 
     def forward(self, x, word):
         '''
-            x: b, 256, 24, 24
+            x: b, 512, 24, 24
             word: b, 768
         '''
         x = self.vis(x) # b, 128, 96, 96
@@ -262,9 +263,9 @@ class TransformerDecoderLayer(nn.Module):
 
     def forward(self, vis, txt, vis_pos, txt_pos, pad_mask):
         '''
-            vis: 26*26, b, 512
+            vis: 24*24, b, 512
             txt: L, b, 512
-            vis_pos: 26*26, 1, 512
+            vis_pos: 24*24, 1, 512
             txt_pos: L, 1, 512
             pad_mask: b, L
         '''

@@ -20,6 +20,8 @@ def kl_div_loss(fix_pred, gt):
     '''
     KullbackLeibler divergence (KL) 
     '''
+    fix_pred = fix_pred.squeeze()
+    gt = gt.squeeze()
     batch_size = fix_pred.size(0)
     w = fix_pred.size(1)
     h = fix_pred.size(2)
@@ -34,14 +36,14 @@ def kl_div_loss(fix_pred, gt):
     
     assert expand_gt.size() == gt.size()
 
-    fix_pred = fix_pred/(expand_s_map*1.0)
-    gt = gt / (expand_gt*1.0)
+    fix_pred = fix_pred / (expand_s_map * 1.0)
+    gt = gt / (expand_gt * 1.0)
 
     fix_pred = fix_pred.view(batch_size, -1)
     gt = gt.view(batch_size, -1)
 
     eps = 2.2204e-16
-    result = gt * torch.log(eps + gt/(fix_pred + eps))
+    result = gt * torch.log(eps + gt / (fix_pred + eps))
     # print(torch.log(eps + gt/(s_map + eps))   )
     return torch.mean(torch.sum(result, 1))
 
