@@ -51,10 +51,6 @@ def kl_div_loss(s_map, gt):
 def correlation_coefficient_loss(s_map, gt):
     '''
     Pearson’s Correlation Coefficient (CC)
-    
-    # Reshape tensors to [batch_size, -1] to flatten spatial dimensions
-    pred_flat = pred.view(pred.size(0), -1)
-    gt_flat = gt.view(gt.size(0), -1)
     '''
     s_map = s_map.squeeze()
     gt = gt.squeeze()
