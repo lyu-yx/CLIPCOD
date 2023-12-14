@@ -67,6 +67,8 @@ class CLIPCOD(nn.Module):
         super().__init__()
         # para init
         self.fixation_weight = cfg.fixation_weight
+        self.kl_weight = cfg.kl_weight
+        self.cc_weight = cfg.cc_weight
         
         # Vision & Text Encoder
         clip_model = torch.jit.load(cfg.clip_pretrain, map_location="cpu").eval()
@@ -131,8 +133,8 @@ class CLIPCOD(nn.Module):
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
-            fix_loss = kl_loss + cc_loss
-            total_loss = fix_loss * self.fixation_weight + mask_loss 
+            fix_loss = kl_loss * self.kl_weight + cc_loss * self.cc_weight
+            total_loss = mask_loss + fix_loss * self.fixation_weight
             return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss
         else:
             return pred.detach()

@@ -42,6 +42,8 @@ TRAIN:
   manual_seed: 0
   print_freq: 100
   fixation_weight: 0.5
+  cc_weight: 5
+  kl_weight: 0.5
   # Resume & Save
   weight:  # path to initial weight (default: none)
   resume:  # path to latest checkpoint (default: none)
