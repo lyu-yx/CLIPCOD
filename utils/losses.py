@@ -61,22 +61,3 @@ def correlation_coefficient_loss(pred, gt):
     correlation_coefficient = dot_product / (std_pred * std_gt + 1e-8)  # Add small epsilon to avoid division by zero
 
     return correlation_coefficient.mean()
-
-    # batch_size = s_map.size(0)
-    # w = s_map.size(1)
-    # h = s_map.size(2)
-
-    # mean_s_map = torch.mean(s_map.view(batch_size, -1), 1).view(batch_size, 1, 1).expand(batch_size, w, h)
-    # std_s_map = torch.std(s_map.view(batch_size, -1), 1).view(batch_size, 1, 1).expand(batch_size, w, h)
-
-    # mean_gt = torch.mean(gt.view(batch_size, -1), 1).view(batch_size, 1, 1).expand(batch_size, w, h)
-    # std_gt = torch.std(gt.view(batch_size, -1), 1).view(batch_size, 1, 1).expand(batch_size, w, h)
-
-    # s_map = (s_map - mean_s_map) / std_s_map
-    # gt = (gt - mean_gt) / std_gt
-
-    # ab = torch.sum((s_map * gt).view(batch_size, -1), 1)
-    # aa = torch.sum((s_map * s_map).view(batch_size, -1), 1)
-    # bb = torch.sum((gt * gt).view(batch_size, -1), 1)
-
-    # return torch.mean(ab / (torch.sqrt(aa*bb)))

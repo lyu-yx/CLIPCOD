@@ -87,8 +87,8 @@ class CLIPCOD(nn.Module):
                                           return_intermediate=cfg.intermediate)
         # Projector
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
-        
-    def forward(self, img, word, img_gt, fix_gt):
+         
+    def forward(self, img, word, img_gt, fix_gt=None):
         '''
             img: b, 3, h, w
             word: b, words
@@ -105,7 +105,7 @@ class CLIPCOD(nn.Module):
         word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
 
         # b, c, 24, 24
-        fix_out = self.fix_encoder(vis)  # [b, 1, 24, 24]
+        fix_out = self.fix_encoder(vis)  # [b, 1, 96, 96]
 
         multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
         b, c, h, w = multimodal_feats.size()
@@ -121,6 +121,13 @@ class CLIPCOD(nn.Module):
                 img_gt = F.interpolate(img_gt, pred.shape[-2:], mode='nearest').detach()
                 fix_gt = F.interpolate(fix_gt, pred.shape[-2:], mode='nearest').detach()
            
+
+            # normalization 
+            img_gt = (img_gt - img_gt.min()) / (img_gt.max() - img_gt.min() + 1e-8)
+            fix_gt = (fix_gt - fix_gt.min()) / (fix_gt.max() - fix_gt.min() + 1e-8)
+            pred = (pred - pred.min()) / (pred.max() - pred.min() + 1e-8)
+            fix_out = (fix_out - fix_out.min()) / (fix_out.max() - fix_out.min() + 1e-8)
+
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
