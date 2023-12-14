@@ -116,7 +116,7 @@ def val(test_loader, model, epoch, args, shared_vars):
             
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
-            res = model(image, desc)
+            res = model(image, desc, gt)
 
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
