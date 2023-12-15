@@ -59,38 +59,28 @@ class DimensionalReduction(nn.Module):
 class FixationEstimation(nn.Module):
     def __init__(self, in_channels):
         super(FixationEstimation, self).__init__()
-        self.reduce0 = DimensionalReduction(in_channels[0], 256)
-        self.reduce1 = DimensionalReduction(in_channels[1], 256)
+        self.reduce0 = DimensionalReduction(in_channels[0], 256) #  x0 -> x2 shallower to deeper
+        self.reduce1 = DimensionalReduction(in_channels[1], 256) #  1024/768 worddim
         self.reduce2 = DimensionalReduction(in_channels[2], 256)
-        self.shallow_fusion = nn.Sequential(
-            conv_layer(in_channels[0] + 256, 256, 3, padding=1)
-        )
+        self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(256, 128, 3, padding=1),
-            nn.Conv2d(128, 1, 1),
-            nn.Sigmoid()
-        )
+            nn.Conv2d(128, 1, 1))
     
     def forward(self, x):
-        x0 = d3_to_d4(x[0])
-        x0_reduced = self.reduce0(x0)  # [b, 256, 24, 24]
+        # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
+        x0 = d3_to_d4(self, x[0])
+        x0 = self.reduce0(x0)      # [b, 768, 24, 24] -> [b, 256, 24, 24]
+        x1 = d3_to_d4(self, x[1])  # [b, 768, 24, 24]
+        out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+        # x1 = self.reduce1(x1)
+        x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
+        out = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
         
-        x1 = d3_to_d4(x[1])
-        x1_reduced = self.reduce1(x1)  # [b, 256, 24, 24]
-        
-        shallow_input = torch.cat((x0_reduced, x1_reduced), dim=1)
-        shallow_output = self.shallow_fusion(shallow_input)  # [b, 256, 24, 24]
-
-        x2 = d3_to_d4(x[2])
-        x2_reduced = self.reduce2(x2)  # [b, 256, 24, 24]
-        
-        deep_input = torch.cat((shallow_output, x2_reduced), dim=1)
-        fixation_map = self.deep_fusion(deep_input)  # [b, 1, 48, 48]
-
-        return fixation_map
+        return out
 
 
 class Projector(nn.Module):
