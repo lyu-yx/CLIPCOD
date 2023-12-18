@@ -137,16 +137,16 @@ def val(test_loader, model, epoch, args, shared_vars):
         metrics_dict.update(mae=MAE.get_results()['mae'].round(3))
 
 
-        cur_score = metrics_dict['sm'] + metrics_dict['em']['adp'] + metrics_dict['wfm'] - 0.5 * metrics_dict['mae']
+        cur_score = metrics_dict['sm'] + metrics_dict['em'] + metrics_dict['wfm'] - 0.5 * metrics_dict['mae']
 
         if epoch == 1:
             shared_vars['best_score'] = cur_score
             shared_vars['best_epoch'] = epoch
             shared_vars['best_metric_dict'] = metrics_dict.copy()
             print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em']['adp'], metrics_dict['wfm'], metrics_dict['mae']))
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae']))
             logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em']['adp'], metrics_dict['wfm'], metrics_dict['mae']))
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae']))
             
         else:
             if cur_score > shared_vars['best_score']:
@@ -158,11 +158,11 @@ def val(test_loader, model, epoch, args, shared_vars):
             else:
                 print('>>> not find the best epoch -> continue training ...')
             print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em']['adp'], metrics_dict['wfm'], metrics_dict['mae'],
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
                 shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em']['adp'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
             logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em']['adp'], metrics_dict['wfm'], metrics_dict['mae'],
+                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
                 shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em']['adp'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
 
