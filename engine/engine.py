@@ -32,6 +32,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
+    time.sleep(0.5)
     end = time.time()
 
     for i, (img, img_gt, fix_gt, desc) in enumerate(train_loader):
@@ -113,13 +114,14 @@ def val(test_loader, model, epoch, args, shared_vars):
     with torch.no_grad():
         for i, (image, gt, desc, _) in enumerate(test_loader):
             
+            gt = gt.numpy().astype(np.float32).squeeze()
+            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
             res = model(image, desc, gt)
 
-            gt = gt.numpy().astype(np.float32).squeeze()
-            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
+            
 
             res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
@@ -159,11 +161,11 @@ def val(test_loader, model, epoch, args, shared_vars):
                 print('>>> not find the best epoch -> continue training ...')
             print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
                 epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em']['adp'], 
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
             logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
                 epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em']['adp'], 
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
 
 def test(test_loader, model, cur_dataset, args):

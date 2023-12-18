@@ -17,7 +17,7 @@ TRAIN:
   word_dim: 768 # align with fpn_out[1]
   feats_layer_num: [7, 15, 23]
   fpn_in: [768, 768, 768]  # defined by Vit
-  fpn_out: [256, 768, 1024]
+  fpn_out: [384, 768, 1024]
   sync_bn: True
   # Decoder
   vis_dim: 768 # consist with CLIP out
@@ -27,8 +27,8 @@ TRAIN:
   dropout: 0.1
   intermediate: False
   # Training Setting
-  workers: 16  # data loader workers
-  workers_val: 8
+  workers: 32  # data loader workers
+  workers_val: 16
   epochs: 200
   milestones: [100, 150]
   start_epoch: 0

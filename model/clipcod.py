@@ -93,9 +93,9 @@ class CLIPCOD(nn.Module):
     def forward(self, img, desc, img_gt, fix_gt=None):
         '''
             img: b, 3, h, w
-            word: b, words
-            word_mask: b, words
-            mask: b, 1, h, w
+            desc: b, words
+            img_gt: b, 1, h, w
+            fix_gt: b, 1, h, w
         '''
         # padding mask used in decoder
         pad_mask = torch.zeros_like(desc).masked_fill_(desc == 0, 1).bool()
@@ -134,6 +134,6 @@ class CLIPCOD(nn.Module):
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
             fix_loss = kl_loss * self.kl_weight - cc_loss * self.cc_weight
             total_loss = mask_loss + fix_loss * self.fixation_weight
-            return pred.detach(), fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss
+            return pred.detach(), fix_out.detach(), total_loss, fix_loss, kl_loss, cc_loss, mask_loss
         else:
             return pred.detach()
