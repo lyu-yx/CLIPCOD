@@ -64,7 +64,9 @@ class FixationEstimation(nn.Module):
         self.reduce2 = DimensionalReduction(in_channels[2], 256)
         self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
+            nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(256, 128, 3, padding=1),
             nn.Conv2d(128, 1, 1))
     
@@ -78,9 +80,6 @@ class FixationEstimation(nn.Module):
         x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
         out = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
         
-        # x2 = self.reduce2(x2)
-        # out = self.shallow_fusion(torch.cat((x0, x1), dim=1))
-        # out = self.deep_fusion(torch.cat((out, x2), dim=1))
         return out
 
 
@@ -97,7 +96,7 @@ class Projector(nn.Module):
             conv_layer(in_dim * 2, in_dim, 3, padding=1),
             nn.Conv2d(in_dim, in_dim, 1))
         # textual projector
-        self.c_adj = conv_layer(768, word_dim, 3, padding=1)
+        # self.c_adj = conv_layer(768, word_dim, 3, padding=1)
         out_dim = 1 * in_dim * kernel_size * kernel_size + 1
         self.txt = nn.Linear(word_dim, out_dim)
 

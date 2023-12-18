@@ -65,13 +65,21 @@ class CLIPCODBLANK(nn.Module):
 class CLIPCOD(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        # para init
+        self.fixation_weight = cfg.fixation_weight
+        self.kl_weight = cfg.kl_weight
+        self.cc_weight = cfg.cc_weight
+        
         # Vision & Text Encoder
-        clip_model = torch.jit.load(cfg.clip_pretrain,
-                                    map_location="cpu").eval()
+        clip_model = torch.jit.load(cfg.clip_pretrain, map_location="cpu").eval()
         self.backbone = build_model(clip_model.state_dict(), cfg.word_len, cfg.feats_layer_num).float()
+        
         # Multi-Modal FPN
-        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
+        
+        # fixation prediction
+        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
+        
         # Decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,
                                           d_model=cfg.vis_dim,
@@ -81,30 +89,29 @@ class CLIPCOD(nn.Module):
                                           return_intermediate=cfg.intermediate)
         # Projector
         self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
-        self.fixation_weight = cfg.fixation_weight
-
-    def forward(self, img, word, gt=None):
+         
+    def forward(self, img, desc, img_gt, fix_gt=None):
         '''
             img: b, 3, h, w
-            word: b, words
-            word_mask: b, words
-            mask: b, 1, h, w
+            desc: b, words
+            img_gt: b, 1, h, w
+            fix_gt: b, 1, h, w
         '''
         # padding mask used in decoder
-        pad_mask = torch.zeros_like(word).masked_fill_(word == 0, 1).bool()
+        pad_mask = torch.zeros_like(desc).masked_fill_(desc == 0, 1).bool()
 
         # vis: list: 3 x [b, 576, 768]
         # word: b, 77, 1024
         # state: b, 1024
         vis = self.backbone.encode_image(img)           # list: 3 x [b, 576, 768]
-        word, state = self.backbone.encode_text(word)   # [b, 77, 768] [b, 768]
+        desc, state = self.backbone.encode_text(desc)   # [b, 77, 768] [b, 768]
 
         # b, c, 24, 24
-        fix_out = self.fix_encoder(vis)  # [b, 1, 24, 24]
+        fix_out = self.fix_encoder(vis)  # [b, 1, 96, 96]
 
         multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
         b, c, h, w = multimodal_feats.size()
-        multimodal_feats = self.decoder(multimodal_feats, word, pad_mask)
+        multimodal_feats = self.decoder(multimodal_feats, desc, pad_mask)
         multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
         
@@ -112,14 +119,21 @@ class CLIPCOD(nn.Module):
 
         if self.training:
             # resize mask
-            if pred.shape[-2:] != gt.shape[-2:]:
-                gt = F.interpolate(gt, pred.shape[-2:],
-                                     mode='nearest').detach()
-            mask_loss = structure_loss(pred, gt)
-            kl_loss = kl_div_loss(pred, gt)
-            cc_loss = correlation_coefficient_loss(pred, gt)
-            fix_loss = kl_loss + cc_loss
-            total_loss = fix_loss * self.fixation_weight + mask_loss
-            return pred.detach(), gt, fix_out, total_loss, fix_loss, kl_loss, cc_loss
+            if pred.shape[-2:] != img_gt.shape[-2:]:
+                img_gt = F.interpolate(img_gt, pred.shape[-2:], mode='nearest').detach()
+                fix_gt = F.interpolate(fix_gt, pred.shape[-2:], mode='nearest').detach()
+            
+            # normalization 
+            img_gt = (img_gt - img_gt.min()) / (img_gt.max() - img_gt.min() + 1e-8)
+            fix_gt = (fix_gt - fix_gt.min()) / (fix_gt.max() - fix_gt.min() + 1e-8)
+            pred = (pred - pred.min()) / (pred.max() - pred.min() + 1e-8)
+            fix_out = (fix_out - fix_out.min()) / (fix_out.max() - fix_out.min() + 1e-8)
+
+            mask_loss = structure_loss(pred, img_gt)
+            kl_loss = kl_div_loss(fix_out, fix_gt)
+            cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
+            fix_loss = kl_loss * self.kl_weight - cc_loss * self.cc_weight
+            total_loss = mask_loss + fix_loss * self.fixation_weight
+            return pred.detach(), fix_out.detach(), total_loss, fix_loss, kl_loss, cc_loss, mask_loss
         else:
             return pred.detach()

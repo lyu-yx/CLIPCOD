@@ -16,42 +16,44 @@ def structure_loss(pred, mask):
     return (wbce + wiou).mean()
 
 
-def kl_div_loss(fix_pred, gt):
+def kl_div_loss(s_map, gt):
     '''
     KullbackLeibler divergence (KL) 
     '''
-    fix_pred = fix_pred.squeeze()
+    s_map = s_map.squeeze()
     gt = gt.squeeze()
-    batch_size = fix_pred.size(0)
-    w = fix_pred.size(1)
-    h = fix_pred.size(2)
+    batch_size = s_map.size(0)
+    w = s_map.size(1)
+    h = s_map.size(2)
 
-    sum_s_map = torch.sum(fix_pred.view(batch_size, -1), 1)
+    sum_s_map = torch.sum(s_map.view(batch_size, -1), 1)
     expand_s_map = sum_s_map.view(batch_size, 1, 1).expand(batch_size, w, h)
-    
-    assert expand_s_map.size() == fix_pred.size()
+#     print('expand_s_map',expand_s_map.shape)
+#     print('s_map',s_map.shape)
+    assert expand_s_map.size() == s_map.size()
 
     sum_gt = torch.sum(gt.view(batch_size, -1), 1)
     expand_gt = sum_gt.view(batch_size, 1, 1).expand(batch_size, w, h)
     
     assert expand_gt.size() == gt.size()
 
-    fix_pred = fix_pred / (expand_s_map * 1.0)
-    gt = gt / (expand_gt * 1.0)
+    s_map = s_map/(expand_s_map*1.0)
+    gt = gt / (expand_gt*1.0)
 
-    fix_pred = fix_pred.view(batch_size, -1)
+    s_map = s_map.view(batch_size, -1)
     gt = gt.view(batch_size, -1)
 
     eps = 2.2204e-16
-    result = gt * torch.log(eps + gt / (fix_pred + eps))
+    result = gt * torch.log(eps + gt/(s_map + eps))
     # print(torch.log(eps + gt/(s_map + eps))   )
     return torch.mean(torch.sum(result, 1))
-
 
 def correlation_coefficient_loss(s_map, gt):
     '''
     Pearson’s Correlation Coefficient (CC)
     '''
+    s_map = s_map.squeeze()
+    gt = gt.squeeze()
     batch_size = s_map.size(0)
     w = s_map.size(1)
     h = s_map.size(2)

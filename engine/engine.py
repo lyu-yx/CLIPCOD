@@ -25,25 +25,27 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     fix_loss_meter = AverageMeter('Fix Loss', ':2.4f')
     kl_loss_meter = AverageMeter('KL Loss', ':2.4f')
     cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
+    mask_loss_meter = AverageMeter('mask Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, lr, total_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
+        [batch_time, data_time, lr, total_loss_meter, mask_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter],
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
+    time.sleep(0.5)
     end = time.time()
 
-    for i, (image, target, fix, desc) in enumerate(train_loader):
+    for i, (img, img_gt, fix_gt, desc) in enumerate(train_loader):
         data_time.update(time.time() - end)
         # data
-        image = image.cuda(non_blocking=True)
-        target = target.cuda(non_blocking=True)
+        img = img.cuda(non_blocking=True)
+        img_gt = img_gt.cuda(non_blocking=True)
         desc = desc.cuda(non_blocking=True)
-        fix = fix.cuda(non_blocking=True)
+        fix_gt = fix_gt.cuda(non_blocking=True)
 
         # forward
         with amp.autocast():
-            pred, target, fix_out, total_loss, fix_loss, kl_loss, cc_loss = model(image, desc, target)
+            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss = model(img, desc, img_gt, fix_gt)
 
         # backward
         optimizer.zero_grad()
@@ -56,19 +58,23 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
         # metric
         dist.all_reduce(total_loss.detach())
         total_loss = total_loss / dist.get_world_size()
-        total_loss_meter.update(total_loss.item(), image.size(0))
+        total_loss_meter.update(total_loss.item(), img.size(0))
 
         dist.all_reduce(fix_loss.detach())
         fix_loss = fix_loss / dist.get_world_size()
-        fix_loss.update(fix_loss.item(), image.size(0))
+        fix_loss_meter.update(fix_loss.item(), img.size(0))
 
         dist.all_reduce(kl_loss.detach())
-        kl_loss = total_loss / dist.get_world_size()
-        kl_loss.update(kl_loss.item(), image.size(0))
+        kl_loss = kl_loss / dist.get_world_size()
+        kl_loss_meter.update(kl_loss.item(), img.size(0))
 
         dist.all_reduce(cc_loss.detach())
         cc_loss = cc_loss / dist.get_world_size()
-        cc_loss.update(cc_loss.item(), image.size(0))
+        cc_loss_meter.update(cc_loss.item(), img.size(0))
+
+        dist.all_reduce(mask_loss.detach())
+        mask_loss = mask_loss / dist.get_world_size()
+        mask_loss_meter.update(mask_loss.item(), img.size(0))
 
 
         lr.update(scheduler.get_last_lr()[-1])
@@ -87,6 +93,7 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "training/fix loss": fix_loss_meter.val,
                         "training/kl loss": kl_loss_meter.val,
                         "training/cc loss": cc_loss_meter.val,
+                        "training/mask loss": mask_loss_meter.val,
 
                     },
                     step=epoch * len(train_loader) + (i + 1))
@@ -107,13 +114,14 @@ def val(test_loader, model, epoch, args, shared_vars):
     with torch.no_grad():
         for i, (image, gt, desc, _) in enumerate(test_loader):
             
+            gt = gt.numpy().astype(np.float32).squeeze()
+            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
-            res = model(image, desc)
+            res = model(image, desc, gt)
 
-            gt = gt.numpy().astype(np.float32).squeeze()
-            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
+            
 
             res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
@@ -153,11 +161,11 @@ def val(test_loader, model, epoch, args, shared_vars):
                 print('>>> not find the best epoch -> continue training ...')
             print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
                 epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['wfm'], 
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
             logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
                 epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['wfm'], 
+                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
                 shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
 
 def test(test_loader, model, cur_dataset, args):
