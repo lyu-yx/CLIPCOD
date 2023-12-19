@@ -71,4 +71,18 @@ def correlation_coefficient_loss(s_map, gt):
     aa = torch.sum((s_map * s_map).view(batch_size, -1), 1)
     bb = torch.sum((gt * gt).view(batch_size, -1), 1)
 
-    return torch.mean(ab / (torch.sqrt(aa*bb)))
+    return -torch.mean(ab / (torch.sqrt(aa*bb)))
+
+def cosine_similarity_loss(text_features, visual_features):
+    '''
+    Cosine Similarity loss
+    '''
+    # Normalize the features to have unit norm
+    text_features = F.normalize(text_features, p=2, dim=1)
+    visual_features = F.normalize(visual_features, p=2, dim=1)
+    
+    # Compute cosine similarity
+    cosine_sim = torch.sum(text_features * visual_features, dim=1)
+    
+    # Since we want to maximize similarity, we minimize the negative similarity
+    return -cosine_sim.mean()

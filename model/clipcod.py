@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from model.clip import build_model
-from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss
-from .layers import FPN, Projector, TransformerDecoder, FixationEstimation
+from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss, cosine_similarity_loss
+from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, VisualGateFusion, ProjectionNetwork, pool_visual_features
 
 
 class CLIPCODBLANK(nn.Module):
@@ -65,10 +65,11 @@ class CLIPCODBLANK(nn.Module):
 class CLIPCOD(nn.Module):
     def __init__(self, cfg):
         super().__init__()
-        # para init
+# para init
         self.fixation_weight = cfg.fixation_weight
         self.kl_weight = cfg.kl_weight
         self.cc_weight = cfg.cc_weight
+        self.consistency_weight = cfg.consistency_weight
         
         # Vision & Text Encoder
         clip_model = torch.jit.load(cfg.clip_pretrain, map_location="cpu").eval()
@@ -80,7 +81,14 @@ class CLIPCOD(nn.Module):
         # fixation prediction
         self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
         
-        # Decoder
+        # visual modal fusion
+        self.visual_fusion = VisualGateFusion()
+
+        # projector for consistency loss
+        self.word_proj = ProjectionNetwork(in_channels=cfg.word_dim, out_channels=cfg.projector_dim)
+        self.vis_proj = ProjectionNetwork(in_channels=cfg.vis_dim, out_channels=cfg.projector_dim)
+
+        # multimodal decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,
                                           d_model=cfg.vis_dim,
                                           nhead=cfg.num_head,
@@ -93,7 +101,8 @@ class CLIPCOD(nn.Module):
     def forward(self, img, desc, img_gt, fix_gt=None):
         '''
             img: b, 3, h, w
-            desc: b, words
+            desc: b, worddim, words
+            state: b, words
             img_gt: b, 1, h, w
             fix_gt: b, 1, h, w
         '''
@@ -106,10 +115,17 @@ class CLIPCOD(nn.Module):
         vis = self.backbone.encode_image(img)           # list: 3 x [b, 576, 768]
         desc, state = self.backbone.encode_text(desc)   # [b, 77, 768] [b, 768]
 
-        # b, c, 24, 24
+        # vis branch
         fix_out = self.fix_encoder(vis)  # [b, 1, 96, 96]
+        vis_feats = self.visual_fusion(vis_feats, fix_out) # [b, 576, 768]
+        
+        # for consistency loss
+        vis_proj = pool_visual_features(vis_feats, pooling_type='max') # [b, 576, 768] -> [b, 768]
+        vis_proj = self.vis_proj(vis_proj) # [b, 768] -> [b, 512]
+        word_proj = self.word_proj(desc)   # [b, 768] -> [b, 512]
 
-        multimodal_feats = self.neck(vis, state) # [b, out_channels[1], 24, 24]
+        # multimodal branch
+        # multimodal_feats = self.neck(vis_feats, state) # [b, out_channels[1], 24, 24]
         b, c, h, w = multimodal_feats.size()
         multimodal_feats = self.decoder(multimodal_feats, desc, pad_mask)
         multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
@@ -121,7 +137,7 @@ class CLIPCOD(nn.Module):
             # resize mask
             if pred.shape[-2:] != img_gt.shape[-2:]:
                 img_gt = F.interpolate(img_gt, pred.shape[-2:], mode='nearest').detach()
-                fix_gt = F.interpolate(fix_gt, pred.shape[-2:], mode='nearest').detach()
+                fix_gt = F.interpolate(fix_gt, fix_out.shape[-2:], mode='nearest').detach()
             
             # normalization 
             img_gt = (img_gt - img_gt.min()) / (img_gt.max() - img_gt.min() + 1e-8)
@@ -132,8 +148,9 @@ class CLIPCOD(nn.Module):
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt)
-            fix_loss = kl_loss * self.kl_weight - cc_loss * self.cc_weight
-            total_loss = mask_loss + fix_loss * self.fixation_weight
-            return pred.detach(), fix_out.detach(), total_loss, fix_loss, kl_loss, cc_loss, mask_loss
+            fix_loss = kl_loss * self.kl_weight + cc_loss * self.cc_weight
+            consistency_loss = cosine_similarity_loss(vis_proj, word_proj)
+            total_loss = mask_loss + fix_loss * self.fixation_weight + consistency_loss * self.consistency_weight
+            return pred.detach(), fix_out.detach(), total_loss, fix_loss, kl_loss, cc_loss, mask_loss, consistency_loss
         else:
             return pred.detach()

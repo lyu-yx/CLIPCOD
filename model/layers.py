@@ -3,7 +3,8 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch_geometric.nn import GCNConv, global_mean_pool
+from torch_geometric.data import Data
 
 def conv_layer(in_dim, out_dim, kernel_size=1, padding=0, stride=1):
     return nn.Sequential(
@@ -15,6 +16,34 @@ def linear_layer(in_dim, out_dim, bias=False):
     return nn.Sequential(nn.Linear(in_dim, out_dim, bias),
                          nn.BatchNorm1d(out_dim), nn.ReLU(True))
 
+def pool_visual_features(visual_features, pooling_type='max'):
+    """
+    Pool the 3D visual features to 2D.
+    visual_features: Tensor of shape [b, 576, 768]
+    pooling_type: 'max' or 'avg'
+    """
+    if pooling_type == 'max':
+        pooled, _ = torch.max(visual_features, dim=1)
+    elif pooling_type == 'avg':
+        pooled = torch.mean(visual_features, dim=1)
+    else:
+        raise ValueError("Unsupported pooling type. Choose 'max' or 'avg'.")
+    return pooled
+# def create_graph(fixation_pred, vit_features):
+#     batch_size, _, num_nodes = fixation_pred.shape
+#     _, num_features, _ = vit_features.shape
+
+#     # Node features
+#     fixation_nodes = fixation_pred.view(batch_size * num_nodes, -1)
+#     vit_nodes = vit_features.view(batch_size * num_nodes, num_features)
+#     x = torch.cat([fixation_nodes, vit_nodes], dim=0)
+
+#     # Edge Index
+#     src = torch.arange(batch_size * num_nodes).repeat_interleave(num_nodes)
+#     dest = torch.arange(batch_size * num_nodes, 2 * batch_size * num_nodes).repeat(num_nodes)
+#     edge_index = torch.stack([src, dest], dim=0)
+
+#     return Data(x=x, edge_index=edge_index)
 
 class CoordConv(nn.Module):
     def __init__(self,
@@ -56,6 +85,20 @@ class DimensionalReduction(nn.Module):
         return self.reduce(x)
 
 
+# class GNNFusionModel(nn.Module):
+#     def __init__(self, num_features, hidden_dim=2048, output_dim=576*768):  # Example output_dim for classification
+#         super(GNNFusionModel, self).__init__()
+#         self.conv1 = GCNConv(num_features, hidden_dim)
+#         self.conv2 = GCNConv(hidden_dim, hidden_dim)
+#         self.fc = nn.Linear(hidden_dim, output_dim)
+
+#     def forward(self, data):
+#         x, edge_index, batch = data.x, data.edge_index, data.batch
+#         x = F.relu(self.conv1(x, edge_index))
+#         x = F.relu(self.conv2(x, edge_index))
+#         x = global_mean_pool(x, batch)
+#         return self.fc(x)
+
 class FixationEstimation(nn.Module):
     def __init__(self, in_channels):
         super(FixationEstimation, self).__init__()
@@ -64,11 +107,10 @@ class FixationEstimation(nn.Module):
         self.reduce2 = DimensionalReduction(in_channels[2], 256)
         self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
         self.deep_fusion = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
-            nn.Upsample(scale_factor=2, mode='bilinear'),
-            conv_layer(256, 128, 3, padding=1),
-            nn.Conv2d(128, 1, 1))
+            conv_layer(256, 128, 3, padding=1))
+        self.out = nn.Conv2d(128, 1, 1)
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
     
     def forward(self, x):
         # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
@@ -78,10 +120,49 @@ class FixationEstimation(nn.Module):
         out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
         # x1 = self.reduce1(x1)
         x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
-        out = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
-        
-        return out
+        mid_f = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+        fix_pred = self.out(mid_f)  # [b, 256, 24, 24] -> [b, 1, 24, 24]
+        fix_pred = self.upsample(fix_pred)
+        return fix_pred
 
+class VisualGateFusion(nn.Module):
+    
+    def __init__(self):
+        super().__init__()
+        self.gate = nn.Sequential(
+            nn.Linear(1, 768),
+            nn.Sigmoid()
+        )
+
+    def forward(self, vit_features, fixation_map):
+        b, _, h, w = fixation_map.shape
+        fixation_map_resized = F.adaptive_avg_pool1d(fixation_map.view(b, -1), 576).view(b, 576, 1)
+
+        # Apply gating
+        gating_values = self.gate(fixation_map_resized)
+        enhanced_features = vit_features * gating_values
+
+        return enhanced_features
+
+
+class ProjectionNetwork(nn.Module):
+    def __init__(self, input_dim, proj_dim, hidden_dim=None):
+        super(ProjectionNetwork, self).__init__()
+        if hidden_dim is None:
+            hidden_dim = (input_dim + proj_dim) // 2  # A heuristic for hidden dimension size
+
+        # Define the layers
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(hidden_dim, proj_dim)
+
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
 
 class Projector(nn.Module):
     def __init__(self, word_dim=1024, in_dim=256, kernel_size=3):
