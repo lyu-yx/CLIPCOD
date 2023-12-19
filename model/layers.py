@@ -134,15 +134,27 @@ class VisualGateFusion(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, vit_features, fixation_map):
-        b, _, h, w = fixation_map.shape
-        fixation_map_resized = F.adaptive_avg_pool1d(fixation_map.view(b, -1), 576).view(b, 576, 1)
+    def forward(self, vis_features, fixation_map):
+        b, c, h, w = fixation_map.shape
+        # Resize fixation_map
+        fixation_map_resized = F.adaptive_avg_pool2d(fixation_map, (24, 24)).view(b, -1, 1)
 
-        # Apply gating
-        gating_values = self.gate(fixation_map_resized)
-        enhanced_features = vit_features * gating_values
+        # Process each vis_feature tensor
+        enhanced_features = []
+        for feature in vis_features:
+            # Apply gating to each feature
+            gating_values = self.gate(fixation_map_resized)
+            gating_values = gating_values.expand(-1, -1, 768)
 
-        return enhanced_features
+            # Enhance features
+            enhanced_feature = feature * gating_values
+            enhanced_features.append(enhanced_feature)
+
+        # Combine the enhanced features with more weight on the deeper layer
+        combined_feature = (enhanced_features[0] + 2 * enhanced_features[1] + 4 * enhanced_features[2]) / 7
+
+        return combined_feature
+
 
 
 class ProjectionNetwork(nn.Module):

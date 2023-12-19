@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from model.clip import build_model
 from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss, cosine_similarity_loss
-from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, VisualGateFusion, ProjectionNetwork, pool_visual_features
+from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, VisualGateFusion, ProjectionNetwork, pool_visual_features, d3_to_d4
 
 
 class CLIPCODBLANK(nn.Module):
@@ -85,8 +85,8 @@ class CLIPCOD(nn.Module):
         self.visual_fusion = VisualGateFusion()
 
         # projector for consistency loss
-        self.word_proj = ProjectionNetwork(in_channels=cfg.word_dim, out_channels=cfg.projector_dim)
-        self.vis_proj = ProjectionNetwork(in_channels=cfg.vis_dim, out_channels=cfg.projector_dim)
+        self.word_proj = ProjectionNetwork(input_dim=cfg.word_dim, proj_dim=cfg.projector_dim)
+        self.vis_proj = ProjectionNetwork(input_dim=cfg.vis_dim, proj_dim=cfg.projector_dim)
 
         # multimodal decoder
         self.decoder = TransformerDecoder(num_layers=cfg.num_layers,
@@ -117,17 +117,17 @@ class CLIPCOD(nn.Module):
 
         # vis branch
         fix_out = self.fix_encoder(vis)  # [b, 1, 96, 96]
-        vis_feats = self.visual_fusion(vis_feats, fix_out) # [b, 576, 768]
+        vis_feats = self.visual_fusion(vis, fix_out) # [b, 576, 768]
         
         # for consistency loss
         vis_proj = pool_visual_features(vis_feats, pooling_type='max') # [b, 576, 768] -> [b, 768]
         vis_proj = self.vis_proj(vis_proj) # [b, 768] -> [b, 512]
-        word_proj = self.word_proj(desc)   # [b, 768] -> [b, 512]
+        word_proj = self.word_proj(state)   # [b, 768] -> [b, 512]
 
-        # multimodal branch
-        # multimodal_feats = self.neck(vis_feats, state) # [b, out_channels[1], 24, 24]
-        b, c, h, w = multimodal_feats.size()
-        multimodal_feats = self.decoder(multimodal_feats, desc, pad_mask)
+        # multimodal branch 
+        multimodal_feats = d3_to_d4(self, vis_feats)
+        b, c, h, w = multimodal_feats.size() # [b, out_channels[1], 24, 24]
+        multimodal_feats = self.decoder(multimodal_feats, desc, pad_mask)  # desc should change to while img description
         multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
         
