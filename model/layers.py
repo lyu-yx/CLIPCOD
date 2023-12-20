@@ -144,8 +144,8 @@ class FixationEstimation(nn.Module):
 
         decoder_layer = nn.TransformerDecoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
-
         self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
+        self.aggregate_conv = nn.Conv2d(in_channels=576, out_channels=1, kernel_size=1)
         self.reshape_size = output_map_size
 
     def forward(self, feature_list):
@@ -157,17 +157,58 @@ class FixationEstimation(nn.Module):
 
         # Reshape and project the output to the desired fixation map size
         output = self.intermediate_linear(output)
-        output = output.view(-1, 1, self.reshape_size, self.reshape_size)  # Shape: [b, 1, 96, 96]
+        output = output.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 96, 96]
+        output = self.aggregate_conv(output)  # Shape: [b, 1, 96, 96]
 
         return output
+
+# class VisualGateFusion(nn.Module):
+    
+#     def __init__(self):
+#         super().__init__()
+#         # Convolutional layers to process the fixation map for different feature levels
+#         self.conv_layers1 = self._create_conv_layers()  # for vis_features[0]
+#         self.conv_layers2 = self._create_conv_layers()  # for vis_features[1]
+#         self.conv_layers3 = self._create_conv_layers()  # for vis_features[2]
+
+#     def _create_conv_layers(self):
+#         # Function to create convolutional layers for gating
+#         return nn.Sequential(
+#             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
+#             nn.ReLU(),
+#             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+#             nn.ReLU(),
+#             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+#             nn.ReLU(),
+#             nn.Flatten(),
+#             nn.Linear(64*12*12, 768),
+#             nn.Sigmoid()
+#         )
+
+#     def forward(self, vis_features, fixation_map):
+#         b, _, _, _ = fixation_map.shape
+#         # Generate different gating values for each feature level
+#         gating_values1 = self.conv_layers1(fixation_map).view(b, -1, 768)
+#         gating_values2 = self.conv_layers2(fixation_map).view(b, -1, 768)
+#         gating_values3 = self.conv_layers3(fixation_map).view(b, -1, 768)
+
+#         # Apply the gating values to enhance features
+#         enhanced_feature1 = vis_features[0] * gating_values1
+#         enhanced_feature2 = vis_features[1] * gating_values2
+#         enhanced_feature3 = vis_features[2] * gating_values3
+
+#         # Combine the enhanced features with more weight on the deeper layers
+#         combined_feature = (enhanced_feature1 + 2 * enhanced_feature2 + 4 * enhanced_feature3) / 7
+
+#         return combined_feature
+
 
 class VisualGateFusion(nn.Module):
     
     def __init__(self):
         super().__init__()
         # Convolutional layers to process the fixation map for different feature levels
-        self.conv_layers1 = self._create_conv_layers()  # for vis_features[0]
-        self.conv_layers2 = self._create_conv_layers()  # for vis_features[1]
+        
         self.conv_layers3 = self._create_conv_layers()  # for vis_features[2]
 
     def _create_conv_layers(self):
@@ -186,21 +227,11 @@ class VisualGateFusion(nn.Module):
 
     def forward(self, vis_features, fixation_map):
         b, _, _, _ = fixation_map.shape
-
         # Generate different gating values for each feature level
-        gating_values1 = self.conv_layers1(fixation_map).view(b, 1, 768)
-        gating_values2 = self.conv_layers2(fixation_map).view(b, 1, 768)
-        gating_values3 = self.conv_layers3(fixation_map).view(b, 1, 768)
-
-        # Apply the gating values to enhance features
-        enhanced_feature1 = vis_features[0] * gating_values1
-        enhanced_feature2 = vis_features[1] * gating_values2
+        gating_values3 = self.conv_layers3(fixation_map).view(b, -1, 768)
         enhanced_feature3 = vis_features[2] * gating_values3
 
-        # Combine the enhanced features with more weight on the deeper layers
-        combined_feature = (enhanced_feature1 + 2 * enhanced_feature2 + 4 * enhanced_feature3) / 7
-
-        return combined_feature
+        return enhanced_feature3
 
 
 class ProjectionNetwork(nn.Module):
