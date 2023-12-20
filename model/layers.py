@@ -165,32 +165,42 @@ class VisualGateFusion(nn.Module):
     
     def __init__(self):
         super().__init__()
-        self.gate = nn.Sequential(
-            nn.Linear(1, 768),
+        # Convolutional layers to process the fixation map for different feature levels
+        self.conv_layers1 = self._create_conv_layers()  # for vis_features[0]
+        self.conv_layers2 = self._create_conv_layers()  # for vis_features[1]
+        self.conv_layers3 = self._create_conv_layers()  # for vis_features[2]
+
+    def _create_conv_layers(self):
+        # Function to create convolutional layers for gating
+        return nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+            nn.Flatten(),
+            nn.Linear(64*12*12, 768),
             nn.Sigmoid()
         )
 
     def forward(self, vis_features, fixation_map):
-        b, c, h, w = fixation_map.shape
-        # Resize fixation_map
-        fixation_map_resized = F.adaptive_avg_pool2d(fixation_map, (24, 24)).view(b, -1, 1)
+        b, _, _, _ = fixation_map.shape
 
-        # Process each vis_feature tensor
-        enhanced_features = []
-        for feature in vis_features:
-            # Apply gating to each feature
-            gating_values = self.gate(fixation_map_resized)
-            gating_values = gating_values.expand(-1, -1, 768)
+        # Generate different gating values for each feature level
+        gating_values1 = self.conv_layers1(fixation_map).view(b, 1, 768)
+        gating_values2 = self.conv_layers2(fixation_map).view(b, 1, 768)
+        gating_values3 = self.conv_layers3(fixation_map).view(b, 1, 768)
 
-            # Enhance features
-            enhanced_feature = feature * gating_values
-            enhanced_features.append(enhanced_feature)
+        # Apply the gating values to enhance features
+        enhanced_feature1 = vis_features[0] * gating_values1
+        enhanced_feature2 = vis_features[1] * gating_values2
+        enhanced_feature3 = vis_features[2] * gating_values3
 
-        # Combine the enhanced features with more weight on the deeper layer
-        combined_feature = (enhanced_features[0] + 2 * enhanced_features[1] + 4 * enhanced_features[2]) / 7
+        # Combine the enhanced features with more weight on the deeper layers
+        combined_feature = (enhanced_feature1 + 2 * enhanced_feature2 + 4 * enhanced_feature3) / 7
 
         return combined_feature
-
 
 
 class ProjectionNetwork(nn.Module):
