@@ -79,7 +79,11 @@ class CLIPCOD(nn.Module):
         self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
         
         # fixation prediction
-        self.fix_encoder = FixationEstimation(in_channels=cfg.fpn_in)
+        self.fix_encoder = FixationEstimation(cfg.fix_embed_dim, 
+                                              cfg.fix_num_head,
+                                              cfg.fix_num_layers,
+                                              cfg.fix_dim_ffn,
+                                              cfg.fix_out_size)
         
         # visual modal fusion
         self.visual_fusion = VisualGateFusion()

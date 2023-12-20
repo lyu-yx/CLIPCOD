@@ -99,31 +99,67 @@ class DimensionalReduction(nn.Module):
 #         x = global_mean_pool(x, batch)
 #         return self.fc(x)
 
-class FixationEstimation(nn.Module):
-    def __init__(self, in_channels):
-        super(FixationEstimation, self).__init__()
-        self.reduce0 = DimensionalReduction(in_channels[0], 256) #  x0 -> x2 shallower to deeper
-        self.reduce1 = DimensionalReduction(in_channels[1], 256) #  1024/768 worddim
-        self.reduce2 = DimensionalReduction(in_channels[2], 256)
-        self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
-        self.deep_fusion = nn.Sequential(
-            conv_layer(in_channels[1] + 256, 256, 3, padding=1),
-            conv_layer(256, 128, 3, padding=1))
-        self.out = nn.Conv2d(128, 1, 1)
-        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
+# class FixationEstimation(nn.Module):
+#     def __init__(self, in_channels):
+#         super(FixationEstimation, self).__init__()
+#         self.reduce0 = DimensionalReduction(in_channels[0], 256) #  x0 -> x2 shallower to deeper
+#         self.reduce1 = DimensionalReduction(in_channels[1], 256) #  1024/768 worddim
+#         self.reduce2 = DimensionalReduction(in_channels[2], 256)
+#         self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
+#         self.deep_fusion = nn.Sequential(
+#             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
+#             conv_layer(256, 128, 3, padding=1))
+#         self.out = nn.Conv2d(128, 1, 1)
+#         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
     
-    def forward(self, x):
-        # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
-        x0 = d3_to_d4(self, x[0])
-        x0 = self.reduce0(x0)      # [b, 768, 24, 24] -> [b, 256, 24, 24]
-        x1 = d3_to_d4(self, x[1])  # [b, 768, 24, 24]
-        out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
-        # x1 = self.reduce1(x1)
-        x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
-        mid_f = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
-        fix_pred = self.out(mid_f)  # [b, 256, 24, 24] -> [b, 1, 24, 24]
-        fix_pred = self.upsample(fix_pred)
-        return fix_pred
+#     def forward(self, x):
+#         # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
+#         x0 = d3_to_d4(self, x[0])
+#         x0 = self.reduce0(x0)      # [b, 768, 24, 24] -> [b, 256, 24, 24]
+#         x1 = d3_to_d4(self, x[1])  # [b, 768, 24, 24]
+#         out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+#         # x1 = self.reduce1(x1)
+#         x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
+#         mid_f = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
+#         fix_pred = self.out(mid_f)  # [b, 256, 24, 24] -> [b, 1, 24, 24]
+#         fix_pred = self.upsample(fix_pred)
+#         return fix_pred
+
+
+class CrossAttentionFusion(nn.Module):
+    def __init__(self, embed_dim, num_heads):
+        super(CrossAttentionFusion, self).__init__()
+        self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+
+    def forward(self, features):
+        kv = torch.cat(features, dim=0)
+        query = features[2]
+        attn_output, _ = self.attention(query=query, key=kv, value=kv)
+        return attn_output
+
+class FixationEstimation(nn.Module):
+    def __init__(self, embed_dim, num_heads, num_decoder_layers, dim_feedforward, output_map_size):
+        super(FixationEstimation, self).__init__()
+        self.fusion = CrossAttentionFusion(embed_dim, num_heads)
+
+        decoder_layer = nn.TransformerDecoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
+
+        self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
+        self.reshape_size = output_map_size
+
+    def forward(self, feature_list):
+        fused_features = self.fusion(feature_list)
+        fused_features = fused_features.permute(1, 0, 2)  # Shape: [sequence_length, batch_size, feature_size]
+
+        memory = torch.zeros(fused_features.size()).to(fused_features.device)
+        output = self.transformer_decoder(fused_features, memory)
+
+        # Reshape and project the output to the desired fixation map size
+        output = self.intermediate_linear(output)
+        output = output.view(-1, 1, self.reshape_size, self.reshape_size)  # Shape: [b, 1, 96, 96]
+
+        return output
 
 class VisualGateFusion(nn.Module):
     
