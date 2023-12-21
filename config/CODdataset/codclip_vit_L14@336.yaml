@@ -25,7 +25,7 @@ TRAIN:
   fix_num_layers: 3
   fix_num_head: 8
   fix_dim_ffn: 2048
-  fix_out_size: 96 # fixation size: [batch, 1, 96, 96]
+  fix_out_size: 24 # fixation size: [batch, 1, 24*4, 24*4]
 
   # Multimodal Decoder
   vis_dim: 768 # consist with CLIP out

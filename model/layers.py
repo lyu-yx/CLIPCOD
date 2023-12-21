@@ -146,11 +146,11 @@ class FixationEstimation(nn.Module):
         # Reshape and project the output to the desired fixation map size
         out_fix = self.intermediate_linear(out_fix)
         out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
-        out_tensor = out_fix.view(-1, 576, self.reshape_size * self.reshape_size)
-
+        out_tensor = out_fix
+        out_tensor = self.tensor_out_conv(out_tensor)  # Shape: [b, 768, 24*24]
         out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
         out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
-        out_tensor = self.tensor_out_conv(out_tensor)  # Shape: [b, 768, 24*24]
+        
 
         return out_fix, out_tensor
 
