@@ -116,12 +116,15 @@ class CrossAttentionFusion(nn.Module):
     def __init__(self, embed_dim, num_heads):
         super(CrossAttentionFusion, self).__init__()
         self.attention = nn.MultiheadAttention(embed_dim=embed_dim, num_heads=num_heads)
+        self.norm = nn.LayerNorm(embed_dim)  # Layer normalization
 
     def forward(self, features):
-        kv = torch.cat(features, dim=0)
-        query = features[2]
+        normalized_features = [self.norm(feature) for feature in features]
+        kv = torch.cat(normalized_features, dim=1)  # Shape: [b, 1728, 768]
+        query = normalized_features[2]  # Shape: [b, 576, 768]
         attn_output, _ = self.attention(query=query, key=kv, value=kv)
-        return attn_output
+        output = attn_output + query  # Shape: [b, 576, 768]
+        return output
 
 class FixationEstimation(nn.Module):
     def __init__(self, embed_dim, num_heads, num_decoder_layers, dim_feedforward, output_map_size):
@@ -132,7 +135,7 @@ class FixationEstimation(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
         self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
         self.aggregate_conv = nn.Conv2d(in_channels=576, out_channels=1, kernel_size=1)
-        self.tensor_out_conv = nn.Conv2d(in_channels=576, out_channels=768, kernel_size=1)
+        self.tensor_out_conv = nn.Conv1d(in_channels=576, out_channels=768, kernel_size=1)
         self.reshape_size = output_map_size
         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
 
@@ -146,13 +149,54 @@ class FixationEstimation(nn.Module):
         # Reshape and project the output to the desired fixation map size
         out_fix = self.intermediate_linear(out_fix)
         out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
-        out_tensor = out_fix
-        out_tensor = self.tensor_out_conv(out_tensor)  # Shape: [b, 768, 24*24]
+        out_tensor = out_fix.view(-1, 576, self.reshape_size * self.reshape_size)
+        out_tensor = self.tensor_out_conv(out_tensor).transpose(1, 2)  # Shape: [b, 576, 768]
         out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
         out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
         
+        return out_fix, out_tensor
+
+
+class FixationEstimation(nn.Module):
+    def __init__(self, embed_dim, num_heads, num_decoder_layers, dim_feedforward, output_map_size):
+        super(FixationEstimation, self).__init__()
+        self.fusion = CrossAttentionFusion(embed_dim, num_heads)
+
+        decoder_layer = nn.TransformerDecoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
+        self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
+        self.aggregate_conv = nn.Conv2d(in_channels=576, out_channels=1, kernel_size=1)
+        self.tensor_out_conv = nn.Conv1d(in_channels=576, out_channels=768, kernel_size=1)
+        self.reshape_size = output_map_size
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
+
+        # Learnable memory initialization
+        self.learnable_memory = nn.Parameter(torch.randn(1, embed_dim), requires_grad=True)
+
+    def forward(self, feature_list):
+        fused_features = self.fusion(feature_list)
+        fused_features = fused_features.permute(1, 0, 2)  # Shape: [sequence_length, batch_size, feature_size]
+
+        # Use learnable memory for the transformer decoder
+        memory = self.learnable_memory.expand(fused_features.size(0), -1, -1)  # Expand to match sequence length
+
+        out_fix = self.transformer_decoder(fused_features, memory)
+
+        # Reshape and project the output to the desired fixation map size
+        out_fix = self.intermediate_linear(out_fix)
+        out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
+
+        # Adding skip connection
+        out_tensor = out_fix + feature_list[2].view(-1, 576, self.reshape_size, self.reshape_size)
+
+        out_tensor = out_tensor.view(-1, 576, self.reshape_size * self.reshape_size)
+        out_tensor = self.tensor_out_conv(out_tensor).transpose(1, 2)  # Shape: [b, 576, 768]
+        out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
+        out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
 
         return out_fix, out_tensor
+
+
 
 # class VisualGateFusion(nn.Module):
     
@@ -195,18 +239,42 @@ class FixationEstimation(nn.Module):
 #         return combined_feature
 
 
-class VisualGateFusion(nn.Module):
-    
-    def __init__(self):
-        super().__init__()
-        # Convolutional layers to process the fixation map for different feature levels
+class FeatureFusionModule(nn.Module):
+    def __init__(self, embed_dim):
+        super(FeatureFusionModule, self).__init__()
+        self.embed_dim = embed_dim
+        # Linear transformation layers for each feature map
+        self.transform_shallow = nn.Linear(embed_dim, embed_dim)
+        self.transform_mid = nn.Linear(embed_dim, embed_dim)
+        self.transform_deep = nn.Linear(embed_dim, embed_dim)
 
-    def forward(self, vis_features, fix_tensor):
-        b, _, _, _ = fix_tensor.shape
-        # Generate different gating values for each feature level
-        out = vis_features[2] * fix_tensor
-        
-        return out
+        # Linear layer for generating attention weights from fixation prediction tensor
+        self.attention_gen = nn.Linear(embed_dim, 3)
+
+    def forward(self, feature_list, fixation_pred):
+        # Assuming feature_list is a list of three tensors each shaped [b, 576, 768]
+        # fixation_pred is shaped [b, 576, 768]
+
+        # Transform features
+        trans_shallow = self.transform_shallow(feature_list[0])
+        trans_mid = self.transform_mid(feature_list[1])
+        trans_deep = self.transform_deep(feature_list[2])
+
+        # Generate attention weights from fixation prediction
+        attention_weights = F.softmax(self.attention_gen(fixation_pred), dim=-1)
+
+        # Apply attention weights
+        weighted_shallow = trans_shallow * attention_weights[:,:,0].unsqueeze(-1)
+        weighted_mid = trans_mid * attention_weights[:,:,1].unsqueeze(-1)
+        weighted_deep = trans_deep * attention_weights[:,:,2].unsqueeze(-1)
+
+        # Aggregating features
+        aggregated_feature = weighted_shallow + weighted_mid + weighted_deep
+
+        # Normalization (if needed)
+        normalized_feature = F.layer_norm(aggregated_feature, [576, self.embed_dim])
+
+        return normalized_feature
 
 
 class ProjectionNetwork(nn.Module):

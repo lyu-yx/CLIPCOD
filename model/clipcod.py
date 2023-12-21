@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from model.clip import build_model
 from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss, cosine_similarity_loss
-from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, VisualGateFusion, ProjectionNetwork, pool_visual_features, d3_to_d4
+from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, FeatureFusionModule, ProjectionNetwork, pool_visual_features, d3_to_d4
 
 
 class CLIPCODBLANK(nn.Module):
@@ -86,7 +86,7 @@ class CLIPCOD(nn.Module):
                                               cfg.fix_out_size)
         
         # visual modal fusion
-        self.visual_fusion = VisualGateFusion()
+        self.visual_fusion = FeatureFusionModule(embed_dim = 768)
 
         # projector for consistency loss
         self.word_proj = ProjectionNetwork(input_dim=cfg.word_dim, proj_dim=cfg.projector_dim)
@@ -100,7 +100,7 @@ class CLIPCOD(nn.Module):
                                           dropout=cfg.dropout,
                                           return_intermediate=cfg.intermediate)
         # Projector
-        self.proj = Projector(cfg.word_dim, cfg.vis_dim , 3)
+        self.proj = Projector(cfg.word_dim, cfg.vis_dim, 3)
          
     def forward(self, img, desc, img_gt, fix_gt=None):
         '''
