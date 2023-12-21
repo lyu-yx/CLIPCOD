@@ -85,20 +85,6 @@ class DimensionalReduction(nn.Module):
         return self.reduce(x)
 
 
-# class GNNFusionModel(nn.Module):
-#     def __init__(self, num_features, hidden_dim=2048, output_dim=576*768):  # Example output_dim for classification
-#         super(GNNFusionModel, self).__init__()
-#         self.conv1 = GCNConv(num_features, hidden_dim)
-#         self.conv2 = GCNConv(hidden_dim, hidden_dim)
-#         self.fc = nn.Linear(hidden_dim, output_dim)
-
-#     def forward(self, data):
-#         x, edge_index, batch = data.x, data.edge_index, data.batch
-#         x = F.relu(self.conv1(x, edge_index))
-#         x = F.relu(self.conv2(x, edge_index))
-#         x = global_mean_pool(x, batch)
-#         return self.fc(x)
-
 # class FixationEstimation(nn.Module):
 #     def __init__(self, in_channels):
 #         super(FixationEstimation, self).__init__()
@@ -146,21 +132,27 @@ class FixationEstimation(nn.Module):
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
         self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
         self.aggregate_conv = nn.Conv2d(in_channels=576, out_channels=1, kernel_size=1)
+        self.tensor_out_conv = nn.Conv2d(in_channels=576, out_channels=768, kernel_size=1)
         self.reshape_size = output_map_size
+        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
 
     def forward(self, feature_list):
         fused_features = self.fusion(feature_list)
         fused_features = fused_features.permute(1, 0, 2)  # Shape: [sequence_length, batch_size, feature_size]
 
         memory = torch.zeros(fused_features.size()).to(fused_features.device)
-        output = self.transformer_decoder(fused_features, memory)
+        out_fix = self.transformer_decoder(fused_features, memory)
 
         # Reshape and project the output to the desired fixation map size
-        output = self.intermediate_linear(output)
-        output = output.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 96, 96]
-        output = self.aggregate_conv(output)  # Shape: [b, 1, 96, 96]
+        out_fix = self.intermediate_linear(out_fix)
+        out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
+        out_tensor = out_fix.view(-1, 576, self.reshape_size * self.reshape_size)
 
-        return output
+        out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
+        out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
+        out_tensor = self.tensor_out_conv(out_tensor)  # Shape: [b, 768, 24*24]
+
+        return out_fix, out_tensor
 
 # class VisualGateFusion(nn.Module):
     
@@ -208,30 +200,13 @@ class VisualGateFusion(nn.Module):
     def __init__(self):
         super().__init__()
         # Convolutional layers to process the fixation map for different feature levels
-        
-        self.conv_layers3 = self._create_conv_layers()  # for vis_features[2]
 
-    def _create_conv_layers(self):
-        # Function to create convolutional layers for gating
-        return nn.Sequential(
-            nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(),
-            nn.Flatten(),
-            nn.Linear(64*12*12, 768),
-            nn.Sigmoid()
-        )
-
-    def forward(self, vis_features, fixation_map):
-        b, _, _, _ = fixation_map.shape
+    def forward(self, vis_features, fix_tensor):
+        b, _, _, _ = fix_tensor.shape
         # Generate different gating values for each feature level
-        gating_values3 = self.conv_layers3(fixation_map).view(b, -1, 768)
-        enhanced_feature3 = vis_features[2] * gating_values3
-
-        return enhanced_feature3
+        out = vis_features[2] * fix_tensor
+        
+        return out
 
 
 class ProjectionNetwork(nn.Module):

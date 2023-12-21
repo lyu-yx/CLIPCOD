@@ -120,8 +120,8 @@ class CLIPCOD(nn.Module):
         desc, state = self.backbone.encode_text(desc)   # [b, 77, 768] [b, 768]
 
         # vis branch
-        fix_out = self.fix_encoder(vis)  # [b, 1, 96, 96]
-        vis_feats = self.visual_fusion(vis, fix_out) # [b, 576, 768]
+        fix_out, fix_tensor = self.fix_encoder(vis)  # [b, 1, 96, 96]  [b, 576, 576]
+        vis_feats = self.visual_fusion(vis, fix_tensor) # [b, 576, 768]
         
         # for consistency loss
         vis_proj = pool_visual_features(vis_feats, pooling_type='max') # [b, 576, 768] -> [b, 768]
