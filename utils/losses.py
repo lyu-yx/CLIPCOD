@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 def structure_loss(pred, mask):
@@ -15,38 +16,33 @@ def structure_loss(pred, mask):
     wiou = 1 - (inter + 1) / (union - inter + 1)
     return (wbce + wiou).mean()
 
+def attribuion_loss(pred_attr, target_attr):
+    criterion_ce = nn.CrossEntropyLoss()
+    criterion_kl = nn.KLDivLoss(reduction='batchmean')
+    attr_ce_loss = criterion_ce(pred_attr, target_attr)
+    log_probs = F.log_softmax(pred_attr, dim=1)
+    attr_kl_loss = criterion_kl(log_probs, target_attr)
+    return attr_ce_loss, attr_kl_loss
 
-def kl_div_loss(s_map, gt):
+
+def kl_div_loss(fix_pred, fix_gt):
     '''
-    KullbackLeibler divergence (KL) 
+    Kullback-Leibler divergence (KL) for fixation maps.
     '''
-    s_map = s_map.squeeze()
-    gt = gt.squeeze()
-    batch_size = s_map.size(0)
-    w = s_map.size(1)
-    h = s_map.size(2)
+    criterion_kl = nn.KLDivLoss(reduction='batchmean')
 
-    sum_s_map = torch.sum(s_map.view(batch_size, -1), 1)
-    expand_s_map = sum_s_map.view(batch_size, 1, 1).expand(batch_size, w, h)
-#     print('expand_s_map',expand_s_map.shape)
-#     print('s_map',s_map.shape)
-    assert expand_s_map.size() == s_map.size()
+    # Flatten fix_pred and apply log_softmax
+    fix_pred_flat = fix_pred.view(fix_pred.size(0), -1)
+    log_s_map_flat = F.log_softmax(fix_pred_flat, dim=1)
+    log_s_map = log_s_map_flat.view_as(fix_pred)
 
-    sum_gt = torch.sum(gt.view(batch_size, -1), 1)
-    expand_gt = sum_gt.view(batch_size, 1, 1).expand(batch_size, w, h)
-    
-    assert expand_gt.size() == gt.size()
+    fix_gt_sum = fix_gt.view(fix_gt.size(0), -1).sum(dim=1, keepdim=True) + 1e-8
+    fix_gt_sum = fix_gt_sum.view(fix_gt.size(0), 1, 1, 1)  # Reshape for correct broadcasting
+    fix_gt_normalized = fix_gt / fix_gt_sum
 
-    s_map = s_map/(expand_s_map*1.0)
-    gt = gt / (expand_gt*1.0)
+    kl_loss = criterion_kl(log_s_map, fix_gt_normalized)
 
-    s_map = s_map.view(batch_size, -1)
-    gt = gt.view(batch_size, -1)
-
-    eps = 2.2204e-16
-    result = gt * torch.log(eps + gt/(s_map + eps))
-    # print(torch.log(eps + gt/(s_map + eps))   )
-    return torch.mean(torch.sum(result, 1))
+    return kl_loss
 
 def correlation_coefficient_loss(s_map, gt):
     '''
@@ -71,4 +67,18 @@ def correlation_coefficient_loss(s_map, gt):
     aa = torch.sum((s_map * s_map).view(batch_size, -1), 1)
     bb = torch.sum((gt * gt).view(batch_size, -1), 1)
 
-    return torch.mean(ab / (torch.sqrt(aa*bb)))
+    return -torch.mean(ab / (torch.sqrt(aa*bb)))
+
+def cosine_similarity_loss(text_features, visual_features):
+    '''
+    Cosine Similarity loss
+    '''
+    # Normalize the features to have unit norm
+    text_features = F.normalize(text_features, p=2, dim=1)
+    visual_features = F.normalize(visual_features, p=2, dim=1)
+    
+    # Compute cosine similarity
+    cosine_sim = torch.sum(text_features * visual_features, dim=1)
+    
+    # Since we want to maximize similarity, we minimize the negative similarity
+    return -cosine_sim.mean()

@@ -19,15 +19,24 @@ TRAIN:
   fpn_in: [768, 768, 768]  # defined by Vit
   fpn_out: [384, 768, 1024]
   sync_bn: True
-  # Decoder
+
+  # Fixation Decoder
+  fix_embed_dim: 768 # consist with CLIP out
+  fix_num_layers: 3
+  fix_num_head: 8
+  fix_dim_ffn: 2048
+  fix_out_size: 24 # fixation size: [batch, 1, 24*4, 24*4]
+
+  # Multimodal Decoder
   vis_dim: 768 # consist with CLIP out
   num_layers: 3
   num_head: 8
   dim_ffn: 2048
   dropout: 0.1
   intermediate: False
+  
   # Training Setting
-  workers: 32  # data loader workers
+  workers: 32  # data loader workersfor feature in vis_features:
   workers_val: 16
   epochs: 200
   milestones: [100, 150]
@@ -41,9 +50,11 @@ TRAIN:
   max_norm: 0.
   manual_seed: 0
   print_freq: 100
-  fixation_weight: 0.5
-  cc_weight: 1
+  projector_dim: 512
+  cc_weight: 0.5
   kl_weight: 1
+  consistency_weight: 0.2
+
   # Resume & Save
   weight:  # path to initial weight (default: none)
   resume:  # path to latest checkpoint (default: none)
