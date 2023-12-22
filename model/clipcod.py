@@ -76,7 +76,7 @@ class CLIPCOD(nn.Module):
         self.backbone = build_model(clip_model.state_dict(), cfg.word_len, cfg.feats_layer_num).float()
         
         # Multi-Modal FPN
-        self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
+        # self.neck = FPN(in_channels=cfg.fpn_in, out_channels=cfg.fpn_out)
         
         # fixation prediction
         self.fix_encoder = FixationEstimation(cfg.fix_embed_dim, 
