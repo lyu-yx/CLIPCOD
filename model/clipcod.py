@@ -66,7 +66,6 @@ class CLIPCOD(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 # para init
-        self.fixation_weight = cfg.fixation_weight
         self.kl_weight = cfg.kl_weight
         self.cc_weight = cfg.cc_weight
         self.consistency_weight = cfg.consistency_weight
@@ -152,9 +151,9 @@ class CLIPCOD(nn.Module):
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt) * self.kl_weight
             cc_loss = correlation_coefficient_loss(fix_out, fix_gt) * self.cc_weight
-            fix_loss = (kl_loss + cc_loss) * self.fixation_weight 
+            fix_loss = kl_loss + cc_loss
             consistency_loss = cosine_similarity_loss(vis_proj, word_proj) * self.consistency_weight
-            total_loss = mask_loss + fix_loss  + consistency_loss 
+            total_loss = mask_loss + fix_loss + consistency_loss 
             return pred.detach(), fix_out.detach(), total_loss, fix_loss, kl_loss, cc_loss, mask_loss, consistency_loss
         else:
             return pred.detach()

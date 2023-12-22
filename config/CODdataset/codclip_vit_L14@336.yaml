@@ -51,7 +51,6 @@ TRAIN:
   manual_seed: 0
   print_freq: 100
   projector_dim: 512
-  fixation_weight: 1
   cc_weight: 0.5
   kl_weight: 1
   consistency_weight: 0.2
