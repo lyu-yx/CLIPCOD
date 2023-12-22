@@ -29,7 +29,8 @@ def kl_div_loss(s_map, gt):
     KullbackLeibler divergence (KL) 
     '''
     criterion_kl = nn.KLDivLoss(reduction='batchmean')
-    kl_loss = criterion_kl(s_map, s_map)
+    log_s_map = F.log_softmax(s_map, dim=1)  # Applying log-softmax to s_map
+    kl_loss = criterion_kl(log_s_map, gt)
 
     return kl_loss
 

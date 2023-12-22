@@ -29,6 +29,16 @@ def pool_visual_features(visual_features, pooling_type='max'):
     else:
         raise ValueError("Unsupported pooling type. Choose 'max' or 'avg'.")
     return pooled
+
+def normalize_and_convert_to_logits(tensor, epsilon=1e-6):
+    # Normalize
+    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min() + epsilon)
+
+    # Convert to logits
+    tensor = torch.clamp(tensor, epsilon, 1 - epsilon)
+    logits = torch.log(tensor / (1 - tensor))
+
+    return logits
 # def create_graph(fixation_pred, vit_features):
 #     batch_size, _, num_nodes = fixation_pred.shape
 #     _, num_features, _ = vit_features.shape

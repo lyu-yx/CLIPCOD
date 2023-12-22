@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from model.clip import build_model
 from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss, cosine_similarity_loss
-from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, FeatureFusionModule, ProjectionNetwork, pool_visual_features, d3_to_d4
+from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, FeatureFusionModule, ProjectionNetwork, pool_visual_features, d3_to_d4, normalize_and_convert_to_logits
 
 
 class CLIPCODBLANK(nn.Module):
@@ -144,10 +144,10 @@ class CLIPCOD(nn.Module):
                 fix_gt = F.interpolate(fix_gt, fix_out.shape[-2:], mode='nearest').detach()
             
             # normalization 
-            img_gt = (img_gt - img_gt.min()) / (img_gt.max() - img_gt.min() + 1e-8)
-            fix_gt = (fix_gt - fix_gt.min()) / (fix_gt.max() - fix_gt.min() + 1e-8)
-            pred = (pred - pred.min()) / (pred.max() - pred.min() + 1e-8)
-            fix_out = (fix_out - fix_out.min()) / (fix_out.max() - fix_out.min() + 1e-8)
+            img_gt = normalize_and_convert_to_logits(img_gt)
+            pred = normalize_and_convert_to_logits(pred)
+            fix_out = normalize_and_convert_to_logits(fix_out)
+            fix_gt = normalize_and_convert_to_logits(fix_gt)
 
             mask_loss = structure_loss(pred, img_gt)
             kl_loss = kl_div_loss(fix_out, fix_gt)
