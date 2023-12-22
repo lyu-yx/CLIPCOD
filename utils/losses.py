@@ -24,13 +24,23 @@ def attribuion_loss(pred_attr, target_attr):
     attr_kl_loss = criterion_kl(log_probs, target_attr)
     return attr_ce_loss, attr_kl_loss
 
-def kl_div_loss(s_map, gt):
+
+def kl_div_loss(fix_pred, fix_gt):
     '''
-    KullbackLeibler divergence (KL) 
+    Kullback-Leibler divergence (KL) for fixation maps.
     '''
     criterion_kl = nn.KLDivLoss(reduction='batchmean')
-    log_s_map = F.log_softmax(s_map, dim=1)  # Applying log-softmax to s_map
-    kl_loss = criterion_kl(log_s_map, gt)
+
+    # Flatten fix_pred and apply log_softmax
+    fix_pred_flat = fix_pred.view(fix_pred.size(0), -1)
+    log_s_map_flat = F.log_softmax(fix_pred_flat, dim=1)
+    log_s_map = log_s_map_flat.view_as(fix_pred)
+
+    fix_gt_sum = fix_gt.view(fix_gt.size(0), -1).sum(dim=1, keepdim=True) + 1e-8
+    fix_gt_sum = fix_gt_sum.view(fix_gt.size(0), 1, 1, 1)  # Reshape for correct broadcasting
+    fix_gt_normalized = fix_gt / fix_gt_sum
+
+    kl_loss = criterion_kl(log_s_map, fix_gt_normalized)
 
     return kl_loss
 

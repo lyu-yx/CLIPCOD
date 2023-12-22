@@ -30,30 +30,13 @@ def pool_visual_features(visual_features, pooling_type='max'):
         raise ValueError("Unsupported pooling type. Choose 'max' or 'avg'.")
     return pooled
 
-def normalize_and_convert_to_logits(tensor, epsilon=1e-6):
-    # Normalize
-    tensor = (tensor - tensor.min()) / (tensor.max() - tensor.min() + epsilon)
-
+def convert_to_logits(tensor, epsilon=1e-6):
     # Convert to logits
     tensor = torch.clamp(tensor, epsilon, 1 - epsilon)
     logits = torch.log(tensor / (1 - tensor))
 
     return logits
-# def create_graph(fixation_pred, vit_features):
-#     batch_size, _, num_nodes = fixation_pred.shape
-#     _, num_features, _ = vit_features.shape
 
-#     # Node features
-#     fixation_nodes = fixation_pred.view(batch_size * num_nodes, -1)
-#     vit_nodes = vit_features.view(batch_size * num_nodes, num_features)
-#     x = torch.cat([fixation_nodes, vit_nodes], dim=0)
-
-#     # Edge Index
-#     src = torch.arange(batch_size * num_nodes).repeat_interleave(num_nodes)
-#     dest = torch.arange(batch_size * num_nodes, 2 * batch_size * num_nodes).repeat(num_nodes)
-#     edge_index = torch.stack([src, dest], dim=0)
-
-#     return Data(x=x, edge_index=edge_index)
 
 class CoordConv(nn.Module):
     def __init__(self,
