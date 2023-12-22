@@ -126,6 +126,7 @@ class CrossAttentionFusion(nn.Module):
         output = attn_output + query  # Shape: [b, 576, 768]
         return output
 
+
 class FixationEstimation(nn.Module):
     def __init__(self, embed_dim, num_heads, num_decoder_layers, dim_feedforward, output_map_size):
         super(FixationEstimation, self).__init__()
@@ -138,38 +139,7 @@ class FixationEstimation(nn.Module):
         self.tensor_out_conv = nn.Conv1d(in_channels=576, out_channels=768, kernel_size=1)
         self.reshape_size = output_map_size
         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
-
-    def forward(self, feature_list):
-        fused_features = self.fusion(feature_list)
-        fused_features = fused_features.permute(1, 0, 2)  # Shape: [sequence_length, batch_size, feature_size]
-
-        memory = torch.zeros(fused_features.size()).to(fused_features.device)
-        out_fix = self.transformer_decoder(fused_features, memory)
-
-        # Reshape and project the output to the desired fixation map size
-        out_fix = self.intermediate_linear(out_fix)
-        out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
-        out_tensor = out_fix.view(-1, 576, self.reshape_size * self.reshape_size)
-        out_tensor = self.tensor_out_conv(out_tensor).transpose(1, 2)  # Shape: [b, 576, 768]
-        out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
-        out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
         
-        return out_fix, out_tensor
-
-
-class FixationEstimation(nn.Module):
-    def __init__(self, embed_dim, num_heads, num_decoder_layers, dim_feedforward, output_map_size):
-        super(FixationEstimation, self).__init__()
-        self.fusion = CrossAttentionFusion(embed_dim, num_heads)
-
-        decoder_layer = nn.TransformerDecoderLayer(d_model=embed_dim, nhead=num_heads, dim_feedforward=dim_feedforward)
-        self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers=num_decoder_layers)
-        self.intermediate_linear = nn.Linear(embed_dim, output_map_size * output_map_size)
-        self.aggregate_conv = nn.Conv2d(in_channels=576, out_channels=1, kernel_size=1)
-        self.tensor_out_conv = nn.Conv1d(in_channels=576, out_channels=768, kernel_size=1)
-        self.reshape_size = output_map_size
-        self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
-
         # Learnable memory initialization
         self.learnable_memory = nn.Parameter(torch.randn(1, embed_dim), requires_grad=True)
 
@@ -178,19 +148,17 @@ class FixationEstimation(nn.Module):
         fused_features = fused_features.permute(1, 0, 2)  # Shape: [sequence_length, batch_size, feature_size]
 
         # Use learnable memory for the transformer decoder
-        memory = self.learnable_memory.expand(fused_features.size(0), -1, -1)  # Expand to match sequence length
+        memory = self.learnable_memory.unsqueeze(0).expand(fused_features.size(0), fused_features.size(1), -1)  # Expand to match sequence length
 
         out_fix = self.transformer_decoder(fused_features, memory)
 
         # Reshape and project the output to the desired fixation map size
         out_fix = self.intermediate_linear(out_fix)
         out_fix = out_fix.view(-1, 576, self.reshape_size, self.reshape_size)  # Shape: [b, 576, 24, 24]
-
-        # Adding skip connection
-        out_tensor = out_fix + feature_list[2].view(-1, 576, self.reshape_size, self.reshape_size)
-
-        out_tensor = out_tensor.view(-1, 576, self.reshape_size * self.reshape_size)
+        out_tensor = out_fix.view(-1, 576, self.reshape_size * self.reshape_size)
         out_tensor = self.tensor_out_conv(out_tensor).transpose(1, 2)  # Shape: [b, 576, 768]
+        # # Adding skip connection
+        out_tensor = out_tensor + feature_list[2]
         out_fix = self.aggregate_conv(out_fix)  # Shape: [b, 1, 24, 24]
         out_fix = self.upsample(out_fix)  # Shape: [b, 1, 96, 96]
 

@@ -86,7 +86,7 @@ class CLIPCOD(nn.Module):
                                               cfg.fix_out_size)
         
         # visual modal fusion
-        self.visual_fusion = FeatureFusionModule(embed_dim = 768)
+        self.visual_fusion = FeatureFusionModule(embed_dim=768)
 
         # projector for consistency loss
         self.word_proj = ProjectionNetwork(input_dim=cfg.word_dim, proj_dim=cfg.projector_dim)
