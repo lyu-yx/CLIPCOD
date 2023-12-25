@@ -187,28 +187,27 @@ def test(test_loader, model, cur_dataset, args):
     with torch.no_grad():
         for i, (image, gt, desc, name) in tqdm(enumerate(test_loader)):
             gt = gt.numpy().astype(np.float32).squeeze()
-            gt /= (gt.max() + 1e-8)
+            gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
+            
             image = image.cuda(non_blocking=True)
             desc = desc.cuda(non_blocking=True)
-            res = model(image, desc)
+            res = model(image, desc, gt)
 
-            res = F.upsample(res, size=gt.shape[-2:], mode='bilinear', align_corners=False)
+            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
-            
-            # save image
-            if args.save_map:
-                map_save_path = os.path.join(args.map_save_path, cur_dataset)
-                os.makedirs(map_save_path, exist_ok=True)
-                plt.imsave(map_save_path + '/' + str(name).split('.')[0][2:] + '.png', res, cmap='gist_gray') 
+
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
             EM.step(pred=res*255, gt=gt*255)
             MAE.step(pred=res*255, gt=gt*255)
+            
 
         sm = SM.get_results()['sm'].round(3)
         adpem = EM.get_results()['em']['adp'].round(3)
         wfm = WFM.get_results()['wfm'].round(3)
         mae = MAE.get_results()['mae'].round(3)
+    
+    print(f'{cur_dataset} done.')
 
     return {'Sm':sm, 'adpE':adpem, 'wF':wfm, 'M':mae}
