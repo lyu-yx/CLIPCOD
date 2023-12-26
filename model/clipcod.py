@@ -83,7 +83,7 @@ class CLIPCOD(nn.Module):
                                               cfg.fix_num_layers,
                                               cfg.fix_dim_ffn,
                                               cfg.fix_out_size)
-        self.attr_pred = AttributePrediction(num_tokens=576, feature_dim=768, num_attr=cfg.num_attr)
+        # self.attr_pred = AttributePrediction(num_tokens=576, feature_dim=768, num_attr=cfg.num_attr)
         # visual modal fusion
         self.visual_fusion = FeatureFusionModule(embed_dim=768)
 

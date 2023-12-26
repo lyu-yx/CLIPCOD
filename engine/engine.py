@@ -117,7 +117,7 @@ def val(test_loader, model, epoch, args, shared_vars):
 
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, desc, _) in enumerate(test_loader):
+        for i, (image, gt, desc, _, _) in enumerate(test_loader):
             
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
@@ -185,7 +185,7 @@ def test(test_loader, model, cur_dataset, args):
     
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, desc, name) in tqdm(enumerate(test_loader)):
+        for i, (image, gt, desc, name, shape) in tqdm(enumerate(test_loader)):
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
@@ -198,7 +198,11 @@ def test(test_loader, model, cur_dataset, args):
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 
             if args.visualize:
-                plt.savefig(os.path.join(args.vis_dir, name))
+                res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
+                res *= 255
+                res = res.numpy().astype(np.uint8)
+                cv2.imwrite(os.path.join(args.vis_dir, name[0]), res)
+                
 
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
