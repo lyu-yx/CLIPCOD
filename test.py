@@ -53,7 +53,7 @@ def main():
     args.model_dir = os.path.join(args.output_dir, "Net_epoch_best.pth")
     if os.path.isfile(args.model_dir):
         logger.info("=> loading checkpoint '{}'".format(args.model_dir))
-        checkpoint = torch.load(args.model_dir)
+        checkpoint = torch.load(args.model_dir, map_location="cuda:0")
         model.load_state_dict(checkpoint, strict=True)
         logger.info("=> loaded checkpoint '{}'".format(args.model_dir))
     else:
@@ -71,20 +71,22 @@ def main():
                                 testsize=args.input_size,
                                 word_length=args.word_len)
         
-        
-        
         test_loader = data.DataLoader(test_data,
                                     batch_size=args.batch_size_val,
                                     shuffle=False,
                                     num_workers=args.workers_val,
                                     pin_memory=True,
                                     drop_last=False)
+        if args.visualize:
+            args.vis_dir = os.path.join(args.output_dir, "vis", cur_dataset)
+            os.makedirs(args.vis_dir, exist_ok=True)
+
         print(f"Loading {cur_dataset} done.")
     
 
-    # inference
-    results = test(test_loader, model, cur_dataset, args)
-    print(results)
+        # inference
+        results = test(test_loader, model, cur_dataset, args)
+        print(results)
 
 if __name__ == '__main__':
     main()

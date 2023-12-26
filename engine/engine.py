@@ -197,6 +197,9 @@ def test(test_loader, model, cur_dataset, args):
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
 
+            if args.visualize:
+                plt.savefig(os.path.join(args.vis_dir, name))
+
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
             EM.step(pred=res*255, gt=gt*255)
