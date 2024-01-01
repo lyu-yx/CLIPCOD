@@ -271,6 +271,9 @@ class TestDataset(data.Dataset):
         with open(self.desc[index], 'r') as file:
                 desc = file.read()
 
+        # save img shape
+        shape = gt.size
+        
         # data augumentation
         image, gt, _ = cv_random_flip(image, gt, gt)
         image, gt, _ = randomCrop(image, gt, gt)
@@ -288,7 +291,7 @@ class TestDataset(data.Dataset):
         if name.endswith('.jpg'):
             name = name.split('.jpg')[0] + '.png'
 
-        return image, gt, word_vec, name
+        return image, gt, word_vec, name, shape
 
     def filter_files(self):
         assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])

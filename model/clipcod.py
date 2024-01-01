@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from model.clip import build_model
 from utils.losses import structure_loss, kl_div_loss, correlation_coefficient_loss, cosine_similarity_loss
-from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, FeatureFusionModule, ProjectionNetwork, pool_visual_features, d3_to_d4
+from .layers import FPN, Projector, TransformerDecoder, FixationEstimation, FeatureFusionModule, ProjectionNetwork, AttributePrediction, pool_visual_features, d3_to_d4
 
 
 class CLIPCODBLANK(nn.Module):
@@ -83,7 +83,7 @@ class CLIPCOD(nn.Module):
                                               cfg.fix_num_layers,
                                               cfg.fix_dim_ffn,
                                               cfg.fix_out_size)
-        
+        # self.attr_pred = AttributePrediction(num_tokens=576, feature_dim=768, num_attr=cfg.num_attr)
         # visual modal fusion
         self.visual_fusion = FeatureFusionModule(embed_dim=768)
 

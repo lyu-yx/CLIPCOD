@@ -27,6 +27,8 @@ TRAIN:
   fix_dim_ffn: 2048
   fix_out_size: 24 # fixation size: [batch, 1, 24*4, 24*4]
 
+  # Attribute prediction
+  num_attr: 20
   # Multimodal Decoder
   vis_dim: 768 # consist with CLIP out
   num_layers: 3
@@ -41,7 +43,7 @@ TRAIN:
   epochs: 200
   milestones: [100, 150]
   start_epoch: 0
-  batch_size: 10  # batch size for training
+  batch_size: 12  # batch size for training
   batch_size_val: 1  # batch size for validation during training, use 1 for metric compatibale consideration
   base_lr: 0.0001
   lr_decay: 0.2
@@ -70,4 +72,4 @@ Distributed:
 
 TEST:
   test_split: val-test
-  visualize: False
+  visualize: True

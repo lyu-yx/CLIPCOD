@@ -78,31 +78,6 @@ class DimensionalReduction(nn.Module):
         return self.reduce(x)
 
 
-# class FixationEstimation(nn.Module):
-#     def __init__(self, in_channels):
-#         super(FixationEstimation, self).__init__()
-#         self.reduce0 = DimensionalReduction(in_channels[0], 256) #  x0 -> x2 shallower to deeper
-#         self.reduce1 = DimensionalReduction(in_channels[1], 256) #  1024/768 worddim
-#         self.reduce2 = DimensionalReduction(in_channels[2], 256)
-#         self.shallow_fusion = nn.Sequential(conv_layer(in_channels[0] + 256, 256, 3, padding=1))
-#         self.deep_fusion = nn.Sequential(
-#             conv_layer(in_channels[1] + 256, 256, 3, padding=1),
-#             conv_layer(256, 128, 3, padding=1))
-#         self.out = nn.Conv2d(128, 1, 1)
-#         self.upsample = nn.Upsample(scale_factor=4, mode='bilinear')
-    
-#     def forward(self, x):
-#         # size = x[0].size()[2:]   # x: 3*[b, 576, 768]
-#         x0 = d3_to_d4(self, x[0])
-#         x0 = self.reduce0(x0)      # [b, 768, 24, 24] -> [b, 256, 24, 24]
-#         x1 = d3_to_d4(self, x[1])  # [b, 768, 24, 24]
-#         out = self.shallow_fusion(torch.cat((x0, x1), dim=1)) # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
-#         # x1 = self.reduce1(x1)
-#         x2 = d3_to_d4(self, x[2])  # [b, 768, 24, 24]
-#         mid_f = self.deep_fusion(torch.cat((out, x2), dim=1))   # [b, 768+256, 24, 24] -> [b, 256, 24, 24]
-#         fix_pred = self.out(mid_f)  # [b, 256, 24, 24] -> [b, 1, 24, 24]
-#         fix_pred = self.upsample(fix_pred)
-#         return fix_pred
 
 
 class CrossAttentionFusion(nn.Module):
@@ -158,47 +133,45 @@ class FixationEstimation(nn.Module):
         return out_fix, out_tensor
 
 
+class AttributePrediction(nn.Module):
+    def __init__(self, num_tokens, feature_dim, num_attr, deeper_layer_weight=0.5):
+        super(AttributePrediction, self).__init__()
+        self.deeper_layer_weight = deeper_layer_weight
+        self.middle_layer_weight = (1 - deeper_layer_weight) / 2
+        self.shallower_layer_weight = (1 - deeper_layer_weight) / 2
 
-# class VisualGateFusion(nn.Module):
-    
-#     def __init__(self):
-#         super().__init__()
-#         # Convolutional layers to process the fixation map for different feature levels
-#         self.conv_layers1 = self._create_conv_layers()  # for vis_features[0]
-#         self.conv_layers2 = self._create_conv_layers()  # for vis_features[1]
-#         self.conv_layers3 = self._create_conv_layers()  # for vis_features[2]
+        # Initial dimension reduction
+        self.init_reduce_dim = nn.Linear(feature_dim, 256)
 
-#     def _create_conv_layers(self):
-#         # Function to create convolutional layers for gating
-#         return nn.Sequential(
-#             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),
-#             nn.ReLU(),
-#             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-#             nn.ReLU(),
-#             nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-#             nn.ReLU(),
-#             nn.Flatten(),
-#             nn.Linear(64*12*12, 768),
-#             nn.Sigmoid()
-#         )
+        # Further dimension reduction
+        self.reduce_dim = nn.Linear(num_tokens * 256 * 3, 512)
 
-#     def forward(self, vis_features, fixation_map):
-#         b, _, _, _ = fixation_map.shape
-#         # Generate different gating values for each feature level
-#         gating_values1 = self.conv_layers1(fixation_map).view(b, -1, 768)
-#         gating_values2 = self.conv_layers2(fixation_map).view(b, -1, 768)
-#         gating_values3 = self.conv_layers3(fixation_map).view(b, -1, 768)
+        # Fully connected layers
+        self.fc1 = nn.Linear(512, 256)
+        self.batch_norm1 = nn.BatchNorm1d(256)
+        self.relu = nn.ReLU()
+        self.dropout = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(256, num_attr)
 
-#         # Apply the gating values to enhance features
-#         enhanced_feature1 = vis_features[0] * gating_values1
-#         enhanced_feature2 = vis_features[1] * gating_values2
-#         enhanced_feature3 = vis_features[2] * gating_values3
+    def forward(self, tensors):
+        # Apply weights and initial reduction to each tensor
+        reduced_tensors = [self.init_reduce_dim(t * weight) for t, weight in zip(tensors, 
+                        [self.shallower_layer_weight, self.middle_layer_weight, self.deeper_layer_weight])]
 
-#         # Combine the enhanced features with more weight on the deeper layers
-#         combined_feature = (enhanced_feature1 + 2 * enhanced_feature2 + 4 * enhanced_feature3) / 7
+        # Concatenate the tensors along the feature dimension
+        concatenated = torch.cat(reduced_tensors, dim=-1)  # Size: [b, 576, 256*3]
+        
+        # Further reduce the dimensionality of the concatenated tensor
+        reduced = self.reduce_dim(concatenated.view(concatenated.size(0), -1))
 
-#         return combined_feature
+        # Apply linear layers and other components
+        attr_ctrb = self.fc1(reduced)
+        attr_ctrb = self.batch_norm1(attr_ctrb)
+        attr_ctrb = self.relu(attr_ctrb)
+        attr_ctrb = self.dropout(attr_ctrb)
+        attr_ctrb = self.fc2(attr_ctrb)
 
+        return attr_ctrb
 
 class FeatureFusionModule(nn.Module):
     def __init__(self, embed_dim):
