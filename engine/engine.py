@@ -193,21 +193,21 @@ def test(test_loader, model, cur_dataset, args):
             desc = desc.cuda(non_blocking=True)
             res = model(image, desc, gt)
 
-            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
-            res = res.sigmoid().data.cpu().numpy().squeeze()
-            res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+            res2 = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
+            res2 = res2.sigmoid().data.cpu().numpy().squeeze()
+            res2 = (res2 - res2.min()) / (res2.max() - res2.min() + 1e-8)
 
             if args.visualize:
                 res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
-                res *= 255
-                res = res.numpy().astype(np.uint8)
-                cv2.imwrite(os.path.join(args.vis_dir, name[0]), res)
+                res = res.sigmoid().data.cpu().numpy().squeeze()
+                res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+                cv2.imwrite(os.path.join(args.vis_dir, name[0]), res*255)
                 
 
-            WFM.step(pred=res*255, gt=gt*255)
-            SM.step(pred=res*255, gt=gt*255)
-            EM.step(pred=res*255, gt=gt*255)
-            MAE.step(pred=res*255, gt=gt*255)
+            WFM.step(pred=res2*255, gt=gt*255)
+            SM.step(pred=res2*255, gt=gt*255)
+            EM.step(pred=res2*255, gt=gt*255)
+            MAE.step(pred=res2*255, gt=gt*255)
             
 
         sm = SM.get_results()['sm'].round(3)
