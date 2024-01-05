@@ -67,7 +67,6 @@ def main():
         print(f"Loading {cur_dataset}...")
         test_data = TestDataset(image_root=test_root + '/Imgs/',
                                 gt_root=test_root + '/GT/',
-                                desc_root=test_root + '/Desc/',
                                 testsize=args.input_size,
                                 word_length=args.word_len)
         

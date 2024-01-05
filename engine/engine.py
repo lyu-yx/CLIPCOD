@@ -27,26 +27,28 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
     cc_loss_meter = AverageMeter('CC Loss', ':2.4f')
     mask_loss_meter = AverageMeter('mask Loss', ':2.4f')
     consistency_loss_meter = AverageMeter('Consistency Loss', ':2.4f')
+    attr_loss_meter = AverageMeter('Attr Loss', ':2.4f')
     progress = ProgressMeter(
         len(train_loader),
-        [batch_time, data_time, lr, total_loss_meter, mask_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter, consistency_loss_meter],
+        [batch_time, data_time, lr, total_loss_meter, mask_loss_meter, fix_loss_meter, kl_loss_meter, cc_loss_meter, consistency_loss_meter, attr_loss_meter],
         prefix="Training: Epoch=[{}/{}] ".format(epoch, args.epochs))
 
     model.train()
     time.sleep(0.5)
     end = time.time()
 
-    for i, (img, img_gt, fix_gt, desc) in enumerate(train_loader):
+    for i, (img, img_gt, fix_gt, overall_desc, camo_desc, attr) in enumerate(train_loader):
         data_time.update(time.time() - end)
         # data
         img = img.cuda(non_blocking=True)
         img_gt = img_gt.cuda(non_blocking=True)
-        desc = desc.cuda(non_blocking=True)
+        overall_desc = overall_desc.cuda(non_blocking=True)
+        camo_desc = camo_desc.cuda(non_blocking=True)
         fix_gt = fix_gt.cuda(non_blocking=True)
-
+        attr = attr.cuda(non_blocking=True)
         # forward
         with amp.autocast():
-            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss, consistency_loss = model(img, desc, img_gt, fix_gt)
+            pred, fix_out, total_loss, fix_loss, kl_loss, cc_loss, mask_loss, consistency_loss, attr_loss = model(img, img_gt, overall_desc, camo_desc, attr, fix_gt)
 
         # backward
         optimizer.zero_grad()
@@ -79,7 +81,11 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
 
         dist.all_reduce(consistency_loss.detach())
         consistency_loss = consistency_loss / dist.get_world_size()
-        consistency_loss_meter.update(consistency_loss.item(), img.size(0))   
+        consistency_loss_meter.update(consistency_loss.item(), img.size(0))
+
+        dist.all_reduce(attr_loss.detach())
+        attr_loss = attr_loss / dist.get_world_size()
+        attr_loss_meter.update(attr_loss.item(), img.size(0))   
 
 
         lr.update(scheduler.get_last_lr()[-1])
@@ -99,7 +105,8 @@ def train(train_loader, model, optimizer, scheduler, scaler, epoch, args):
                         "training/kl loss": kl_loss_meter.val,
                         "training/cc loss": cc_loss_meter.val,
                         "training/mask loss": mask_loss_meter.val,
-                        "training/consistency loss": consistency_loss_meter.val
+                        "training/consistency loss": consistency_loss_meter.val,
+                        "training/attr_loss": attr_loss_meter.val
                     },
                     step=epoch * len(train_loader) + (i + 1))
 
@@ -117,16 +124,13 @@ def val(test_loader, model, epoch, args, shared_vars):
 
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, desc, _, _) in enumerate(test_loader):
+        for i, (image, gt, _, _) in enumerate(test_loader):
             
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
             image = image.cuda(non_blocking=True)
-            desc = desc.cuda(non_blocking=True)
-            res = model(image, desc, gt)
-
-            
+            res = model(image, gt)
 
             res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()

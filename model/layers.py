@@ -173,42 +173,96 @@ class AttributePrediction(nn.Module):
 
         return attr_ctrb
 
+# class FeatureFusionModule(nn.Module):
+#     def __init__(self, embed_dim):
+#         super(FeatureFusionModule, self).__init__()
+#         self.embed_dim = embed_dim
+#         # Linear transformation layers for each feature map
+#         self.transform_shallow = nn.Linear(embed_dim, embed_dim)
+#         self.transform_mid = nn.Linear(embed_dim, embed_dim)
+#         self.transform_deep = nn.Linear(embed_dim, embed_dim)
+
+#         # Linear layer for generating attention weights from fixation prediction tensor
+#         self.attention_gen = nn.Linear(embed_dim, 3)
+
+#     def forward(self, feature_list, fixation_pred):
+#         # Assuming feature_list is a list of three tensors each shaped [b, 576, 768]
+#         # fixation_pred is shaped [b, 576, 768]
+
+#         # Transform features
+#         trans_shallow = self.transform_shallow(feature_list[0])
+#         trans_mid = self.transform_mid(feature_list[1])
+#         trans_deep = self.transform_deep(feature_list[2])
+
+#         # Generate attention weights from fixation prediction
+#         attention_weights = F.softmax(self.attention_gen(fixation_pred), dim=-1)
+
+#         # Apply attention weights
+#         weighted_shallow = trans_shallow * attention_weights[:,:,0].unsqueeze(-1)
+#         weighted_mid = trans_mid * attention_weights[:,:,1].unsqueeze(-1)
+#         weighted_deep = trans_deep * attention_weights[:,:,2].unsqueeze(-1)
+
+#         # Aggregating features
+#         aggregated_feature = weighted_shallow + weighted_mid + weighted_deep
+
+#         # Normalization (if needed)
+#         normalized_feature = F.layer_norm(aggregated_feature, [576, self.embed_dim])
+
+#         return normalized_feature
+
+
+
+
+
+class FeatureTransform(nn.Module):
+    def __init__(self, embed_dim, attr_dim):
+        super(FeatureTransform, self).__init__()
+        self.transform = nn.Linear(embed_dim, embed_dim)
+        self.attr_transform = nn.Linear(attr_dim, embed_dim)
+        self.gate = nn.Sequential(nn.Linear(embed_dim, embed_dim), nn.Sigmoid())
+
+    def forward(self, feature, image_attr):
+        # Transform feature
+        trans_feature = self.transform(feature)
+
+        # Transform image attribution and apply gating
+        attr_feature = self.attr_transform(image_attr).unsqueeze(-1)
+        gate = self.gate(attr_feature)
+
+        # Apply gating with residual connection
+        gated_feature = trans_feature * gate + feature
+        return gated_feature
+
+
 class FeatureFusionModule(nn.Module):
-    def __init__(self, embed_dim):
+    def __init__(self, embed_dim, attr_dim):
         super(FeatureFusionModule, self).__init__()
         self.embed_dim = embed_dim
-        # Linear transformation layers for each feature map
-        self.transform_shallow = nn.Linear(embed_dim, embed_dim)
-        self.transform_mid = nn.Linear(embed_dim, embed_dim)
-        self.transform_deep = nn.Linear(embed_dim, embed_dim)
-
-        # Linear layer for generating attention weights from fixation prediction tensor
+        self.shallow_transform = FeatureTransform(embed_dim, attr_dim)
+        self.mid_transform = FeatureTransform(embed_dim, attr_dim)
+        self.deep_transform = FeatureTransform(embed_dim, attr_dim)
         self.attention_gen = nn.Linear(embed_dim, 3)
 
-    def forward(self, feature_list, fixation_pred):
-        # Assuming feature_list is a list of three tensors each shaped [b, 576, 768]
-        # fixation_pred is shaped [b, 576, 768]
+    def forward(self, feature_list, fixation_pred, image_attr):
+        # Apply transformations
+        gated_shallow = self.shallow_transform(feature_list[0], image_attr)
+        gated_mid = self.mid_transform(feature_list[1], image_attr)
+        gated_deep = self.deep_transform(feature_list[2], image_attr)
 
-        # Transform features
-        trans_shallow = self.transform_shallow(feature_list[0])
-        trans_mid = self.transform_mid(feature_list[1])
-        trans_deep = self.transform_deep(feature_list[2])
-
-        # Generate attention weights from fixation prediction
+        # Generate attention weights
         attention_weights = F.softmax(self.attention_gen(fixation_pred), dim=-1)
 
         # Apply attention weights
-        weighted_shallow = trans_shallow * attention_weights[:,:,0].unsqueeze(-1)
-        weighted_mid = trans_mid * attention_weights[:,:,1].unsqueeze(-1)
-        weighted_deep = trans_deep * attention_weights[:,:,2].unsqueeze(-1)
+        weighted_shallow = gated_shallow * attention_weights[:,:,0].unsqueeze(-1)
+        weighted_mid = gated_mid * attention_weights[:,:,1].unsqueeze(-1)
+        weighted_deep = gated_deep * attention_weights[:,:,2].unsqueeze(-1)
 
-        # Aggregating features
+        # Aggregate features
         aggregated_feature = weighted_shallow + weighted_mid + weighted_deep
-
-        # Normalization (if needed)
         normalized_feature = F.layer_norm(aggregated_feature, [576, self.embed_dim])
 
         return normalized_feature
+
 
 
 class ProjectionNetwork(nn.Module):
@@ -337,25 +391,22 @@ class TransformerDecoder(nn.Module):
 
         return pe.reshape(-1, 1, height * width).permute(2, 1, 0)  # hw, 1, 512
 
-    def forward(self, vis, txt, pad_mask):
+    def forward(self, vis):
         '''
             vis: b, 512, h, w
             txt: b, L, 512
-            pad_mask: b, L
+            
         '''
         B, C, H, W = vis.size()
-        _, L, D = txt.size()
         # position encoding
         vis_pos = self.pos2d(C, H, W)
-        txt_pos = self.pos1d(D, L)
         # reshape & permute
         vis = vis.reshape(B, C, -1).permute(2, 0, 1)
-        txt = txt.permute(1, 0, 2)
         # forward
         output = vis
         intermediate = []
         for layer in self.layers:
-            output = layer(output, txt, vis_pos, txt_pos, pad_mask)
+            output = layer(output, vis_pos)
             if self.return_intermediate:
                 # HW, b, 512 -> b, 512, HW
                 intermediate.append(self.norm(output).permute(1, 2, 0))
@@ -373,47 +424,30 @@ class TransformerDecoder(nn.Module):
                 return output
         return output
 
-
 class TransformerDecoderLayer(nn.Module):
-    def __init__(self,
-                 d_model=512,
-                 nhead=8,
-                 dim_feedforward=2048,
-                 dropout=0.1):
+    def __init__(self, d_model=512, nhead=8, dim_feedforward=2048, dropout=0.1):
         super().__init__()
         # Normalization Layer
         self.self_attn_norm = nn.LayerNorm(d_model)
-        self.cross_attn_norm = nn.LayerNorm(d_model)
         # Attention Layer
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
-        self.multihead_attn = nn.MultiheadAttention(d_model,
-                                                    nhead,
-                                                    dropout=dropout,
-                                                    kdim=d_model,
-                                                    vdim=d_model)
         # FFN
         self.ffn = nn.Sequential(nn.Linear(d_model, dim_feedforward),
                                  nn.ReLU(True), nn.Dropout(dropout),
-                                 nn.LayerNorm(dim_feedforward),
                                  nn.Linear(dim_feedforward, d_model))
         # LayerNorm & Dropout
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
-        self.norm3 = nn.LayerNorm(d_model)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
-        self.dropout3 = nn.Dropout(dropout)
 
     def with_pos_embed(self, tensor, pos):
         return tensor if pos is None else tensor + pos.to(tensor.device)
 
-    def forward(self, vis, txt, vis_pos, txt_pos, pad_mask):
+    def forward(self, vis, vis_pos):
         '''
             vis: 24*24, b, 512
-            txt: L, b, 512
             vis_pos: 24*24, 1, 512
-            txt_pos: L, 1, 512
-            pad_mask: b, L
         '''
         # Self-Attention
         vis2 = self.norm1(vis)
@@ -421,19 +455,72 @@ class TransformerDecoderLayer(nn.Module):
         vis2 = self.self_attn(q, k, value=vis2)[0]
         vis2 = self.self_attn_norm(vis2)
         vis = vis + self.dropout1(vis2)
-        # Cross-Attention
-        vis2 = self.norm2(vis)
-        vis2 = self.multihead_attn(query=self.with_pos_embed(vis2, vis_pos),
-                                   key=self.with_pos_embed(txt, txt_pos),
-                                   value=txt,
-                                   key_padding_mask=pad_mask)[0]
-        vis2 = self.cross_attn_norm(vis2)
-        vis = vis + self.dropout2(vis2)
         # FFN
-        vis2 = self.norm3(vis)
+        vis2 = self.norm2(vis)
         vis2 = self.ffn(vis2)
-        vis = vis + self.dropout3(vis2)
+        vis = vis + self.dropout2(vis2)
         return vis
+
+# class TransformerDecoderLayer(nn.Module):
+#     def __init__(self,
+#                  d_model=512,
+#                  nhead=8,
+#                  dim_feedforward=2048,
+#                  dropout=0.1):
+#         super().__init__()
+#         # Normalization Layer
+#         self.self_attn_norm = nn.LayerNorm(d_model)
+#         self.cross_attn_norm = nn.LayerNorm(d_model)
+#         # Attention Layer
+#         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
+#         self.multihead_attn = nn.MultiheadAttention(d_model,
+#                                                     nhead,
+#                                                     dropout=dropout,
+#                                                     kdim=d_model,
+#                                                     vdim=d_model)
+#         # FFN
+#         self.ffn = nn.Sequential(nn.Linear(d_model, dim_feedforward),
+#                                  nn.ReLU(True), nn.Dropout(dropout),
+#                                  nn.LayerNorm(dim_feedforward),
+#                                  nn.Linear(dim_feedforward, d_model))
+#         # LayerNorm & Dropout
+#         self.norm1 = nn.LayerNorm(d_model)
+#         self.norm2 = nn.LayerNorm(d_model)
+#         self.norm3 = nn.LayerNorm(d_model)
+#         self.dropout1 = nn.Dropout(dropout)
+#         self.dropout2 = nn.Dropout(dropout)
+#         self.dropout3 = nn.Dropout(dropout)
+
+#     def with_pos_embed(self, tensor, pos):
+#         return tensor if pos is None else tensor + pos.to(tensor.device)
+
+#     def forward(self, vis, txt, vis_pos, txt_pos, pad_mask):
+#         '''
+#             vis: 24*24, b, 512
+#             txt: L, b, 512
+#             vis_pos: 24*24, 1, 512
+#             txt_pos: L, 1, 512
+#             pad_mask: b, L
+#         '''
+#         # Self-Attention
+#         vis2 = self.norm1(vis)
+#         q = k = self.with_pos_embed(vis2, vis_pos)
+#         vis2 = self.self_attn(q, k, value=vis2)[0]
+#         vis2 = self.self_attn_norm(vis2)
+#         vis = vis + self.dropout1(vis2)
+#         # Cross-Attention
+#         vis2 = self.norm2(vis)
+#         vis2 = self.multihead_attn(query=self.with_pos_embed(vis2, vis_pos),
+#                                    key=self.with_pos_embed(txt, txt_pos),
+#                                    value=txt,
+#                                    key_padding_mask=pad_mask)[0]
+#         vis2 = self.cross_attn_norm(vis2)
+#         vis = vis + self.dropout2(vis2)
+#         # FFN
+#         vis2 = self.norm3(vis)
+#         vis2 = self.ffn(vis2)
+#         vis = vis + self.dropout3(vis2)
+#         return vis
 
 
 def d3_to_d4(self, t):
