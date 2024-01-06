@@ -166,7 +166,6 @@ class CamObjDataset(data.Dataset):
         print('>>> trainig/validing with {} samples'.format(self.size))
 
     def __getitem__(self, index):
-        # read assest/gts/fix/desc
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
         fix = self.gray_loader(self.fix[index])
@@ -174,7 +173,6 @@ class CamObjDataset(data.Dataset):
                 overall_desc = file.read()
         with open(self.camo_desc[index], 'r') as file:
                 camo_desc = file.read()
-
         with open(self.attri[index], 'r') as file:
                 attrs = file.readlines()
                 for i in range(len(attrs)):
@@ -260,7 +258,7 @@ class TestDataset(data.Dataset):
         # sorted files
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
-        self.desc = sorted(self.desc)
+
 
         # filter mathcing degrees of files
         self.filter_files()
@@ -281,8 +279,7 @@ class TestDataset(data.Dataset):
         # read assest/gts/fix/desc
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
-        with open(self.desc[index], 'r') as file:
-                desc = file.read()
+
 
         # save img shape
         shape = gt.size
@@ -307,9 +304,9 @@ class TestDataset(data.Dataset):
         return image, gt, name, shape
 
     def filter_files(self):
-        assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])
-        images, gts, desc = [], [], []
-        for img_pth, gt_pth, desc_pth in zip(self.images, self.gts, self.desc):
+        assert len(self.gts) == len(self.images) 
+        images, gts= [], []
+        for img_pth, gt_pth in zip(self.images, self.gts):
             img = Image.open(img_pth)
             gt = Image.open(gt_pth)
             

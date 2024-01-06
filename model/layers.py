@@ -226,7 +226,7 @@ class FeatureTransform(nn.Module):
         trans_feature = self.transform(feature)
 
         # Transform image attribution and apply gating
-        attr_feature = self.attr_transform(image_attr).unsqueeze(-1)
+        attr_feature = self.attr_transform(image_attr).unsqueeze(1)
         gate = self.gate(attr_feature)
 
         # Apply gating with residual connection
@@ -285,7 +285,7 @@ class ProjectionNetwork(nn.Module):
         return x
 
 class Projector(nn.Module):
-    def __init__(self, word_dim=1024, in_dim=256, kernel_size=3):
+    def __init__(self, word_dim=768, in_dim=768, kernel_size=3, num_attr=17):
         super().__init__()
         self.in_dim = in_dim
         self.kernel_size = kernel_size
@@ -296,32 +296,44 @@ class Projector(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear'),
             conv_layer(in_dim * 2, in_dim, 3, padding=1),
             nn.Conv2d(in_dim, in_dim, 1))
+        
         # textual projector
-        # self.c_adj = conv_layer(768, word_dim, 3, padding=1)
-        out_dim = 1 * in_dim * kernel_size * kernel_size + 1
+        self.attr_proj = nn.Linear(num_attr, word_dim)
+        out_dim = 1 * word_dim * kernel_size * kernel_size + 1
         self.txt = nn.Linear(word_dim, out_dim)
 
-    def forward(self, x, word):
+        # output projector
+        self.out_proj = conv_layer(in_dim, 1, 1)
+
+    def forward(self, x, attr, use_attr=False):
         '''
-            x: b, 512, 24, 24
-            word: b, 768
+            x: b, vis_dim, 24, 24
         '''
-        x = self.vis(x) # b, 128, 96, 96
-        B, C, H, W = x.size()
-        x = x.reshape(1, B * C, H, W) # 1, b*128, 96, 96
-        # txt: b, (256*3*3 + 1) -> b, 256, 3, 3 / b 
-        word = self.txt(word)
-        weight, bias = word[:, :-1], word[:, -1]
-        weight = weight.reshape(B, C, self.kernel_size, self.kernel_size)
-        # Conv2d - 1, b*256, 104, 104 -> 1, b, 104, 104
-        out = F.conv2d(x,
-                       weight,
-                       padding=self.kernel_size // 2,
-                       groups=weight.size(0),
-                       bias=bias)
-        out = out.transpose(0, 1)
-        # b, 1, 96, 96
-        return out
+        if use_attr:
+            x = self.vis(x) # b, 768, 96, 96
+            B, C, H, W = x.size()
+            x = x.reshape(1, B * C, H, W) # 1, b*768, 96, 96
+            # txt: b, (768*3*3 + 1) -> b, 768, 3, 3 / b 
+            attr = self.attr_proj(attr)
+            attr = self.txt(attr)
+            weight, bias = attr[:, :-1], attr[:, -1]
+            weight = weight.reshape(B, C, self.kernel_size, self.kernel_size)
+            # Conv2d - 1, b*768, 96, 96 -> 1, b, 96, 96
+            out = F.conv2d(x,
+                        weight,
+                        padding=self.kernel_size // 2,
+                        groups=weight.size(0),
+                        bias=bias)
+            out = out.transpose(0, 1)   # b, 1, 96, 96
+            return out
+        else:
+            x = self.vis(x) # b, 768, 96, 96
+            B, C, H, W = x.size()
+            # b, 768, 96, 96 -> b, 1, 96, 96
+            out = self.out_proj(x)
+            # b, 1, 96, 96
+            return out
+            
 
 
 class TransformerDecoder(nn.Module):

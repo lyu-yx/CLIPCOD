@@ -88,14 +88,19 @@ for desc_path in desc_list:
             overall_description = re.split(r"\n\d\.\s", content)[0]
             if overall_description.startswith("1. "):
                 overall_description = overall_description[3:]
-            with open('dataset/TrainDataset/Desc_raw/overall_description/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w') as f:
+            with open('dataset/TrainDataset/Desc_raw/overall_description/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w', encoding='utf-8') as f:
+                overall_description = overall_description.replace('’', "'")
                 f.write(overall_description)
 
             # save the second part of the content to attribute_description
             attribute_description = re.split(r"\n\d\.\s", content)[1]
             if attribute_description.startswith("2. "):
                 attribute_description = attribute_description[3:]
-            with open('dataset/TrainDataset/Desc_raw/attribute_description/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w') as f:
+
+            with open('dataset/TrainDataset/Desc_raw/attribute_description/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w', encoding='utf-8') as f:
+                attribute_description = attribute_description.replace('’', "'")
+                if desc_path.split("\\")[-1] == 'camourflage_00038.json':
+                    print(attribute_description)
                 f.write(attribute_description)
             # save the third part of the content to attribute_contribution
             attribute_contribution = re.split(r"\n\d\.\s", content)[2]
@@ -104,7 +109,7 @@ for desc_path in desc_list:
                 cnt += 1
             else:
                 fail_list.append(desc_path)
-            with open('dataset/TrainDataset/Desc_raw/attribute_contribution/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w') as f:
+            with open('dataset/TrainDataset/Desc_raw/attribute_contribution/' + desc_path.split("\\")[-1][:-5] + '.txt', 'w', encoding='utf-8') as f:
                 for weight in weights_single_line:
                     f.write(f"{weight}\n")
         except Exception as e:

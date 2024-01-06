@@ -129,6 +129,7 @@ def main_worker(gpu, args, shared_vars):
                               attri_root=args.train_root + 'Desc_raw/attribute_contribution_transformed/',
                               trainsize=args.input_size,
                               word_length=args.word_len)
+    
     val_data = TestDataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
                               testsize=args.input_size,
