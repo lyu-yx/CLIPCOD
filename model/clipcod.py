@@ -120,7 +120,6 @@ class CLIPCOD(nn.Module):
             _, overall_state = self.backbone.encode_text(overall_desc)   # [b, 77, 768] [b, 768]
             # camo_w, camo_state = self.backbone.encode_text(camo_desc)   # [b, 77, 768] [b, 768]
 
-
             # vis branch
             # attr prediction
             attr_out = self.attr_pred(vis)
@@ -139,7 +138,7 @@ class CLIPCOD(nn.Module):
             multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
             
-            pred = self.proj(multimodal_feats, overall_state) # [b, c, 96, 96]
+            pred = self.proj(multimodal_feats, attr_out) # [b, c, 96, 96]
             
             # resize mask
             if pred.shape[-2:] != img_gt.shape[-2:]:
@@ -161,7 +160,6 @@ class CLIPCOD(nn.Module):
             vis = self.backbone.encode_image(img)           # list: 3 x [b, 576, 768]
             
             # vis branch only
-
             # attr prediction
             attr_out = self.attr_pred(vis)
             # fix prediction

@@ -284,6 +284,28 @@ class ProjectionNetwork(nn.Module):
         x = self.fc2(x)
         return x
 
+class ConvBR(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_size, stride=1, padding=0, dilation=1):
+        super(ConvBR, self).__init__()
+        self.conv = nn.Conv2d(in_channel, out_channel,
+                              kernel_size=kernel_size, stride=stride,
+                              padding=padding, dilation=dilation, bias=False)
+        self.bn = nn.BatchNorm2d(out_channel)
+        self.relu = nn.ReLU(inplace=True)
+        self.init_weight()
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.bn(x)
+        x = self.relu(x)
+        return x
+
+    def init_weight(self):
+        for ly in self.children():
+            if isinstance(ly, nn.Conv2d):
+                nn.init.kaiming_normal_(ly.weight, a=1)
+                if not ly.bias is None: nn.init.constant_(ly.bias, 0)
+
 class Projector(nn.Module):
     def __init__(self, word_dim=768, in_dim=768, kernel_size=3, num_attr=17):
         super().__init__()
@@ -303,7 +325,10 @@ class Projector(nn.Module):
         self.txt = nn.Linear(word_dim, out_dim)
 
         # output projector
-        self.out_proj = conv_layer(in_dim, 1, 1)
+        self.out_proj = nn.Sequential(
+            ConvBR(in_dim, 128, 3, padding=1),
+            ConvBR(128, 64, 3, padding=1),
+            nn.Conv2d(64, 1, 1))
 
     def forward(self, x, attr, use_attr=False):
         '''
