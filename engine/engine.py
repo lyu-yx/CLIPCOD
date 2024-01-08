@@ -152,8 +152,9 @@ def val(test_loader, model, epoch, args, shared_vars):
         cur_score = metrics_dict['sm'] + metrics_dict['em'] + metrics_dict['wfm'] - 0.5 * metrics_dict['mae']
 
         if epoch == 1:
-            if not os.path.exists(args.model_save_path):
-                os.mkdir(args.model_save_path)
+            if dist.get_rank() == 0:
+                if not os.path.exists(args.model_save_path):
+                    os.mkdir(args.model_save_path)
             shared_vars['best_score'] = cur_score
             shared_vars['best_epoch'] = epoch
             shared_vars['best_metric_dict'] = metrics_dict.copy()
@@ -169,8 +170,8 @@ def val(test_loader, model, epoch, args, shared_vars):
                 shared_vars['best_metric_dict'] = metrics_dict.copy()
                 torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
                 print('>>> Save successfully! cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
-                dist.all_reduce(shared_vars)
-                
+                dist.all_reduce(shared_vars['best_score'])
+                dist.all_reduce(shared_vars['best_epoch'])
             else:
                 print('>>> Continue -> cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
 
