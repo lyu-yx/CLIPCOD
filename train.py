@@ -191,7 +191,9 @@ def main_worker(gpu, args, shared_vars):
         train_sampler.set_epoch(epoch_log)
 
         # train
-        print("start training")
+        if epoch_log == 1:
+            print("start training")
+            
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log, args)
 
         # evaluation & save

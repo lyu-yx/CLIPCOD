@@ -124,18 +124,20 @@ def val(test_loader, model, epoch, args, shared_vars):
 
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, _, _) in enumerate(test_loader):
+        for i, (image, gt, _, shape) in enumerate(test_loader):
             
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
+            
             image = image.cuda(non_blocking=True)
             res = model(image, gt)
 
-            res = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
+            res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
             
+            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
 
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
@@ -152,7 +154,7 @@ def val(test_loader, model, epoch, args, shared_vars):
 
         if epoch == 1:
             if not os.path.exists(args.model_save_path):
-                    os.mkdir(args.model_save_path)
+                os.mkdir(args.model_save_path)
             shared_vars['best_score'] = cur_score
             shared_vars['best_epoch'] = epoch
             shared_vars['best_metric_dict'] = metrics_dict.copy()
@@ -167,17 +169,19 @@ def val(test_loader, model, epoch, args, shared_vars):
                 shared_vars['best_epoch'] = epoch
                 shared_vars['best_metric_dict'] = metrics_dict.copy()
                 torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
-                print('>>> save state_dict successfully! best epoch is {}.'.format(epoch))
+                print('>>> Save successfully! cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
             else:
-                print('>>> not find the best epoch -> continue training ...')
+                print('>>> Continue -> cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
+
             print('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
-                shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
+            epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
+            shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
+            shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
+
             logging.info('[Cur Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})\n[Best Epoch: {}] Metrics (Sm={}, Em={}, Wfm={}, MAE={})'.format(
-                epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
-                shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
-                shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
+            epoch, metrics_dict['sm'], metrics_dict['em'], metrics_dict['wfm'], metrics_dict['mae'],
+            shared_vars['best_epoch'], shared_vars['best_metric_dict']['sm'], shared_vars['best_metric_dict']['em'], 
+            shared_vars['best_metric_dict']['wfm'], shared_vars['best_metric_dict']['mae']))
 
 def test(test_loader, model, cur_dataset, args):
     """
@@ -191,29 +195,25 @@ def test(test_loader, model, cur_dataset, args):
     
     model.eval()
     with torch.no_grad():
-        for i, (image, gt, desc, name, shape) in tqdm(enumerate(test_loader)):
+        for i, (image, gt, name, shape) in tqdm(enumerate(test_loader)):
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
             image = image.cuda(non_blocking=True)
-            desc = desc.cuda(non_blocking=True)
-            res = model(image, desc, gt)
+            res = model(image, gt)
 
-            res2 = F.upsample(res, size=gt.shape, mode='bilinear', align_corners=False)
-            res2 = res2.sigmoid().data.cpu().numpy().squeeze()
-            res2 = (res2 - res2.min()) / (res2.max() - res2.min() + 1e-8)
+            res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
+            res = res.sigmoid().data.cpu().numpy().squeeze()
+            res = (res - res.min()) / (res.max() - res.min() + 1e-8)
+            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
 
             if args.visualize:
-                res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
-                res = res.sigmoid().data.cpu().numpy().squeeze()
-                res = (res - res.min()) / (res.max() - res.min() + 1e-8)
                 cv2.imwrite(os.path.join(args.vis_dir, name[0]), res*255)
-                
-
-            WFM.step(pred=res2*255, gt=gt*255)
-            SM.step(pred=res2*255, gt=gt*255)
-            EM.step(pred=res2*255, gt=gt*255)
-            MAE.step(pred=res2*255, gt=gt*255)
+            
+            WFM.step(pred=res*255, gt=gt*255)
+            SM.step(pred=res*255, gt=gt*255)
+            EM.step(pred=res*255, gt=gt*255)
+            MAE.step(pred=res*255, gt=gt*255)
             
 
         sm = SM.get_results()['sm'].round(3)
