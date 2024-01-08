@@ -3,10 +3,10 @@ DATA:
   test_root: dataset/TestDataset/
   val_root: dataset/TestDataset/CAMO/
   dataset: CODtraindataset
-  model_save_path: pretrain/desc_vision_fix/
+  model_save_path: pretrain/desc_vision_fix_no_attr_proj/
   save_map: True
   map_save_path: exp/
-  exp_name: desc_vision_fix
+  exp_name: desc_vision_fix_no_attr_proj
   test_dataset: ['CHAMELEON', 'CAMO', 'COD10K', 'NC4K']
 
 TRAIN:
@@ -37,7 +37,7 @@ TRAIN:
   dim_ffn: 2048
   dropout: 0.1
   intermediate: False
-  use_attr: True  # use attribute prediction to projector
+  use_attr: False  # use attribute prediction to projector
   
   # Training Setting
   workers: 32  # data loader workersfor feature in vis_features:
