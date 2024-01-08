@@ -127,7 +127,7 @@ def tokenize(texts: Union[str, List[str]],
 
 # dataset for training
 class CamObjDataset(data.Dataset):
-    def __init__(self, image_root, gt_root, fix_root, desc_root, trainsize, word_length):
+    def __init__(self, image_root, gt_root, fix_root, overall_desc_root, camo_desc_root, attri_root, trainsize, word_length):
         self.trainsize = trainsize
         self.word_length = word_length
         # get filenames
@@ -137,13 +137,18 @@ class CamObjDataset(data.Dataset):
                     or f.endswith('.png')]
         self.fix = [fix_root + f for f in os.listdir(fix_root) if f.endswith('.jpg')
                       or f.endswith('.png')]
-        self.desc = [desc_root + f for f in os.listdir(desc_root) if f.endswith('.txt')]
+        self.overall_desc = [overall_desc_root + f for f in os.listdir(overall_desc_root) if f.endswith('.txt')]
+        self.camo_desc = [camo_desc_root + f for f in os.listdir(camo_desc_root) if f.endswith('.txt')]
+        self.attri = [attri_root + f for f in os.listdir(attri_root) if f.endswith('.txt')]
+        
 
         # sorted files
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
         self.fix = sorted(self.fix)
-        self.desc = sorted(self.desc)
+        self.overall_desc = sorted(self.overall_desc)
+        self.camo_desc = sorted(self.camo_desc)
+        self.attri = sorted(self.attri)
 
         # filter mathcing degrees of files
         self.filter_files()
@@ -161,12 +166,17 @@ class CamObjDataset(data.Dataset):
         print('>>> trainig/validing with {} samples'.format(self.size))
 
     def __getitem__(self, index):
-        # read assest/gts/fix/desc
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
         fix = self.gray_loader(self.fix[index])
-        with open(self.desc[index], 'r') as file:
-                desc = file.read()
+        with open(self.overall_desc[index], 'r') as file:
+                overall_desc = file.read()
+        with open(self.camo_desc[index], 'r') as file:
+                camo_desc = file.read()
+        with open(self.attri[index], 'r') as file:
+                attrs = file.readlines()
+                for i in range(len(attrs)):
+                    attrs[i] = float(attrs[i])
 
         # data augumentation
         image, gt, fix = cv_random_flip(image, gt, fix)
@@ -181,14 +191,16 @@ class CamObjDataset(data.Dataset):
         gt = self.gt_transform(gt)
         fix = self.gt_transform(fix)
 
-        word_vec = tokenize(desc, self.word_length, True).squeeze(0)
+        overall_desc_vec = tokenize(overall_desc, self.word_length, True).squeeze(0)
+        camo_desc_vec = tokenize(camo_desc, self.word_length, True).squeeze(0)
+        attrs = torch.tensor(attrs)
 
-        return image, gt, fix, word_vec
+        return image, gt, fix, overall_desc_vec, camo_desc_vec, attrs
 
     def filter_files(self):
-        assert all(len(lst) == len(self.images) for lst in [self.gts, self.fix, self.desc])
+        assert all(len(lst) == len(self.images) for lst in [self.gts, self.fix, self.overall_desc])
         images, gts, fixs, desc = [], [], [], []
-        for img_pth, gt_pth, fix_pth, desc_pth in zip(self.images, self.gts, self.fix, self.desc):
+        for img_pth, gt_pth, fix_pth, desc_pth in zip(self.images, self.gts, self.fix, self.overall_desc):
             img = Image.open(img_pth)
             gt = Image.open(gt_pth)
             fix = Image.open(fix_pth)
@@ -234,7 +246,7 @@ def get_loader(image_root, gt_root, edge_root, batchsize, trainsize,
 
 # test dataset and loader
 class TestDataset(data.Dataset):
-    def __init__(self, image_root, gt_root, desc_root, testsize, word_length):
+    def __init__(self, image_root, gt_root, testsize, word_length):
         self.testsize = testsize
         self.word_length = word_length
         # get filenames
@@ -242,12 +254,11 @@ class TestDataset(data.Dataset):
                        or f.endswith('.png')]
         self.gts = [gt_root + f for f in os.listdir(gt_root) if f.endswith('.jpg')
                     or f.endswith('.png')]
-        self.desc = [desc_root + f for f in os.listdir(desc_root) if f.endswith('.txt')]
 
         # sorted files
         self.images = sorted(self.images)
         self.gts = sorted(self.gts)
-        self.desc = sorted(self.desc)
+
 
         # filter mathcing degrees of files
         self.filter_files()
@@ -268,8 +279,7 @@ class TestDataset(data.Dataset):
         # read assest/gts/fix/desc
         image = self.rgb_loader(self.images[index])
         gt = self.binary_loader(self.gts[index])
-        with open(self.desc[index], 'r') as file:
-                desc = file.read()
+
 
         # save img shape
         shape = gt.size
@@ -285,18 +295,18 @@ class TestDataset(data.Dataset):
         image = self.img_transform(image)
         gt = self.gt_transform(gt)
 
-        word_vec = tokenize(desc, self.word_length, True).squeeze(0)
+        # word_vec = tokenize(desc, self.word_length, True).squeeze(0)
 
         name = self.images[index].split('/')[-1]
         if name.endswith('.jpg'):
             name = name.split('.jpg')[0] + '.png'
 
-        return image, gt, word_vec, name, shape
+        return image, gt, name, shape
 
     def filter_files(self):
-        assert all(len(lst) == len(self.images) for lst in [self.gts, self.desc])
-        images, gts, desc = [], [], []
-        for img_pth, gt_pth, desc_pth in zip(self.images, self.gts, self.desc):
+        assert len(self.gts) == len(self.images) 
+        images, gts= [], []
+        for img_pth, gt_pth in zip(self.images, self.gts):
             img = Image.open(img_pth)
             gt = Image.open(gt_pth)
             

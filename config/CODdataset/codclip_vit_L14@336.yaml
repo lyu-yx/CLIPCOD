@@ -28,7 +28,8 @@ TRAIN:
   fix_out_size: 24 # fixation size: [batch, 1, 24*4, 24*4]
 
   # Attribute prediction
-  num_attr: 20
+  num_attr: 17
+
   # Multimodal Decoder
   vis_dim: 768 # consist with CLIP out
   num_layers: 3
@@ -36,6 +37,7 @@ TRAIN:
   dim_ffn: 2048
   dropout: 0.1
   intermediate: False
+  use_attr: True  # use attribute prediction to projector
   
   # Training Setting
   workers: 32  # data loader workersfor feature in vis_features:

@@ -124,12 +124,14 @@ def main_worker(gpu, args, shared_vars):
     train_data = CamObjDataset(image_root=args.train_root + 'Imgs/',
                               gt_root=args.train_root + 'GT/',
                               fix_root=args.train_root + 'Fix/',
-                              desc_root=args.train_root + 'Desc/',
+                              overall_desc_root=args.train_root + 'Desc_raw/overall_description/',
+                              camo_desc_root=args.train_root + 'Desc_raw/attribute_description/',
+                              attri_root=args.train_root + 'Desc_raw/attribute_contribution_transformed/',
                               trainsize=args.input_size,
                               word_length=args.word_len)
+    
     val_data = TestDataset(image_root=args.val_root + 'Imgs/',
                               gt_root=args.val_root + 'GT/',
-                              desc_root=args.val_root + 'Desc/',
                               testsize=args.input_size,
                               word_length=args.word_len)
     # total_step = len(train_data)
@@ -189,7 +191,9 @@ def main_worker(gpu, args, shared_vars):
         train_sampler.set_epoch(epoch_log)
 
         # train
-        print("start training")
+        if epoch_log == 1:
+            print("start training")
+            
         train(train_loader, model, optimizer, scheduler, scaler, epoch_log, args)
 
         # evaluation & save
