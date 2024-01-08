@@ -26,6 +26,8 @@ TRAIN:
   dim_ffn: 2048
   dropout: 0.1
   intermediate: False
+  use_attr: False  # use attribute prediction to projector
+  
   # Training Setting
   workers: 16  # data loader workers
   workers_val: 8
