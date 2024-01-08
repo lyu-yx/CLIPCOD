@@ -169,6 +169,7 @@ def val(test_loader, model, epoch, args, shared_vars):
                 shared_vars['best_metric_dict'] = metrics_dict.copy()
                 torch.save(model.state_dict(), args.model_save_path + 'Net_epoch_best.pth')
                 print('>>> Save successfully! cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
+                dist.all_reduce(shared_vars)
             else:
                 print('>>> Continue -> cur score: {}, best score: {}'.format(cur_score, shared_vars['best_score']))
 
