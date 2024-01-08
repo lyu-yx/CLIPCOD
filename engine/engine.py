@@ -126,6 +126,8 @@ def val(test_loader, model, epoch, args, shared_vars):
     with torch.no_grad():
         for i, (image, gt, _, shape) in enumerate(test_loader):
             
+            shape = (shape[1], shape[0])
+            
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
@@ -196,6 +198,7 @@ def test(test_loader, model, cur_dataset, args):
     model.eval()
     with torch.no_grad():
         for i, (image, gt, name, shape) in tqdm(enumerate(test_loader)):
+            shape = (shape[1], shape[0])
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
