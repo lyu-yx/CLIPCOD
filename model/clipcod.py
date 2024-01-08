@@ -69,6 +69,7 @@ class CLIPCOD(nn.Module):
         self.kl_weight = cfg.kl_weight
         self.cc_weight = cfg.cc_weight
         self.consistency_weight = cfg.consistency_weight
+        self.use_attr = cfg.use_attr
         
         # Vision & Text Encoder
         clip_model = torch.jit.load(cfg.clip_pretrain, map_location="cpu").eval()
@@ -138,7 +139,7 @@ class CLIPCOD(nn.Module):
             multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
             
-            pred = self.proj(multimodal_feats, attr_out) # [b, c, 96, 96]
+            pred = self.proj(multimodal_feats, attr_out, self.use_attr) # [b, c, 96, 96]
             
             # resize mask
             if pred.shape[-2:] != img_gt.shape[-2:]:
@@ -173,6 +174,6 @@ class CLIPCOD(nn.Module):
             multimodal_feats = multimodal_feats.reshape(b, c, h, w)  # [b, c, 24, 24]
 
             
-            pred = self.proj(multimodal_feats, attr_out) # [b, c, 96, 96]
+            pred = self.proj(multimodal_feats, attr_out, self.use_attr) # [b, c, 96, 96]
 
             return pred.detach()

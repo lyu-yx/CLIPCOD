@@ -125,12 +125,11 @@ def val(test_loader, model, epoch, args, shared_vars):
     model.eval()
     with torch.no_grad():
         for i, (image, gt, _, shape) in enumerate(test_loader):
-            
             shape = (shape[1], shape[0])
-            
+
+            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
-            
             
             image = image.cuda(non_blocking=True)
             res = model(image, gt)
@@ -138,8 +137,6 @@ def val(test_loader, model, epoch, args, shared_vars):
             res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
-            
-            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
 
             WFM.step(pred=res*255, gt=gt*255)
             SM.step(pred=res*255, gt=gt*255)
@@ -198,7 +195,9 @@ def test(test_loader, model, cur_dataset, args):
     model.eval()
     with torch.no_grad():
         for i, (image, gt, name, shape) in tqdm(enumerate(test_loader)):
+            
             shape = (shape[1], shape[0])
+            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
             gt = gt.numpy().astype(np.float32).squeeze()
             gt = (gt - gt.min()) / (gt.max() - gt.min() + 1e-8)
             
@@ -208,8 +207,7 @@ def test(test_loader, model, cur_dataset, args):
             res = F.upsample(res, size=shape, mode='bilinear', align_corners=False)
             res = res.sigmoid().data.cpu().numpy().squeeze()
             res = (res - res.min()) / (res.max() - res.min() + 1e-8)
-            gt = F.upsample(gt, size=shape, mode='bilinear', align_corners=False)
-
+            
             if args.visualize:
                 cv2.imwrite(os.path.join(args.vis_dir, name[0]), res*255)
             
